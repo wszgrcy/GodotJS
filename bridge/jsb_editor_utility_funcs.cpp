@@ -7,6 +7,10 @@
 #include "modules/GodotJS/weaver-editor/jsb_editor_plugin.h"
 #endif
 
+// Same contract as JSB_GET_FIELD_NAME_PRESET, but the value goes through the engine's
+// documentation translation domain.
+#define JSB_GET_FIELD_NAME_DOC(InstName, ValueName) ((void)sizeof(jsb_private::get_member_name(std::decay_t<decltype(InstName)>::ValueName)), JSB_STRINGIFY(ValueName)), DTR(InstName.ValueName)
+
 #if JSB_WITH_EDITOR_UTILITY_FUNCS
 namespace jsb_private
 {
@@ -875,6 +879,9 @@ namespace jsb
         return class_info_obj;
     }
 
+    // `DocData` always holds the raw English text from `doc/classes/*.xml`; the editor itself
+    // translates on display through `DTR()` (see `editor/doc/editor_help.cpp`). With no doc
+    // translation loaded for the current locale `DTR()` returns the source string unchanged.
     static void _get_class_doc(const v8::FunctionCallbackInfo<v8::Value>& info)
     {
         v8::Isolate* isolate = info.GetIsolate();
@@ -889,7 +896,7 @@ namespace jsb
         		v8::Local<v8::Object> class_doc_obj = v8::Object::New(isolate);
 
         		// doc:class<brief>
-        		set_field(isolate, context, class_doc_obj, JSB_GET_FIELD_NAME_PRESET(class_doc, brief_description));
+        		set_field(isolate, context, class_doc_obj, JSB_GET_FIELD_NAME_DOC(class_doc, brief_description));
 
         		// doc:constants
         		{
@@ -904,7 +911,7 @@ namespace jsb
         				String constant_name = internal::NamingUtil::get_constant_name(constant_doc.name);
         				constants_obj->Set(context, impl::Helper::new_string(isolate, constant_name), constant_obj).Check();
 
-        				set_field(isolate, context, constant_obj, "description", constant_doc.description);
+        				set_field(isolate, context, constant_obj, "description", DTR(constant_doc.description));
         			}
         		}
 
@@ -921,7 +928,7 @@ namespace jsb
         				String method_name = internal::NamingUtil::get_member_name(method_doc.name);
         				methods_obj->Set(context, impl::Helper::new_string(isolate, method_name), method_obj).Check();
 
-        				set_field(isolate, context, method_obj, "description", method_doc.description);
+        				set_field(isolate, context, method_obj, "description", DTR(method_doc.description));
         			}
         		}
 
@@ -937,7 +944,7 @@ namespace jsb
         				String property_name = internal::NamingUtil::get_member_name(property_doc.name);
         				properties_obj->Set(context, impl::Helper::new_string(isolate, property_name), property_obj).Check();
 
-        				set_field(isolate, context, property_obj, "description", property_doc.description);
+        				set_field(isolate, context, property_obj, "description", DTR(property_doc.description));
         			}
         		}
 
@@ -954,7 +961,7 @@ namespace jsb
         				String signal_name = internal::NamingUtil::get_member_name(signal_doc.name);
         				signals_obj->Set(context, impl::Helper::new_string(isolate, signal_name), signal_obj).Check();
 
-        				set_field(isolate, context, signal_obj, "description", signal_doc.description);
+        				set_field(isolate, context, signal_obj, "description", DTR(signal_doc.description));
         			}
         		}
 
