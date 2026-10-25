@@ -198,4 +198,145 @@ namespace jsb
     };
 }
 
+#if !JSB_GDEXTENSION
+namespace jsb::compat
+{
+    // 4.7 moved a class' constants, enums and signals from `ClassDB::ClassInfo` into `GDType`.
+    // Every accessor below passes `true` (= no inheritance) to match 4.6, whose maps hold the
+    // class' own members only; 4.7 would otherwise also return inherited ones. Those reach
+    // JavaScript through the prototype chain instead.
+    //
+    // 4.7's `GDType::EnumInfo` already pairs each constant name with its value; 4.6 stored the
+    // names only, so the shim below restores the values from `constant_map`.
+#if GODOT_4_7_OR_NEWER
+    using EnumInfoCompat = GDType::EnumInfo;
+#else
+    struct EnumInfoCompat
+    {
+        StringName name;
+        Vector<KeyValue<StringName, int64_t>> values;
+        bool is_bitfield = false;
+    };
+#endif
+
+    // same shape as `EnumInfoCompat`, for callers whose data does not come from `ClassDB`
+    struct EnumInfoLocal
+    {
+        Vector<KeyValue<StringName, int64_t>> values;
+        bool is_bitfield = false;
+    };
+
+    // pre-4.6 engines used `HashMap` instead of `AHashMap`.
+#if GODOT_4_6_OR_NEWER
+    using JsbConstantMap = AHashMap<StringName, int64_t>;
+#else
+    using JsbConstantMap = HashMap<StringName, int64_t>;
+#endif
+
+    inline jsb_force_inline const StringName& get_class_name(const ClassDB::ClassInfo* p_class_info)
+    {
+        CRASH_COND(p_class_info == nullptr);
+#if GODOT_4_7_OR_NEWER
+        CRASH_COND(p_class_info->gdtype == nullptr);
+        return p_class_info->gdtype->get_name();
+#else
+        return p_class_info->name;
+#endif
+    }
+
+    inline jsb_force_inline const StringName& get_class_super_name(const ClassDB::ClassInfo* p_class_info)
+    {
+        CRASH_COND(p_class_info == nullptr);
+#if GODOT_4_7_OR_NEWER
+        CRASH_COND(p_class_info->gdtype == nullptr);
+        return p_class_info->gdtype->get_super_type_name();
+#else
+        return p_class_info->inherits;
+#endif
+    }
+
+    inline jsb_force_inline const JsbConstantMap& get_class_constants(const ClassDB::ClassInfo* p_class_info)
+    {
+        CRASH_COND(p_class_info == nullptr);
+#if GODOT_4_7_OR_NEWER
+        CRASH_COND(p_class_info->gdtype == nullptr);
+        return p_class_info->gdtype->get_integer_constant_map(true);
+#else
+        return p_class_info->constant_map;
+#endif
+    }
+
+    inline jsb_force_inline size_t get_class_enum_count(const ClassDB::ClassInfo* p_class_info)
+    {
+        CRASH_COND(p_class_info == nullptr);
+#if GODOT_4_7_OR_NEWER
+        CRASH_COND(p_class_info->gdtype == nullptr);
+        return p_class_info->gdtype->get_enum_map(true).size();
+#else
+        return p_class_info->enum_map.size();
+#endif
+    }
+
+    inline jsb_force_inline size_t get_class_signal_count(const ClassDB::ClassInfo* p_class_info)
+    {
+        CRASH_COND(p_class_info == nullptr);
+#if GODOT_4_7_OR_NEWER
+        CRASH_COND(p_class_info->gdtype == nullptr);
+        return p_class_info->gdtype->get_signal_map(true).size();
+#else
+        return p_class_info->signal_map.size();
+#endif
+    }
+
+    // p_callable: void (const StringName& p_name, const MethodInfo& p_info)
+    template <typename TCallable>
+    jsb_force_inline void for_each_class_signal(const ClassDB::ClassInfo* p_class_info, const TCallable& p_callable)
+    {
+        CRASH_COND(p_class_info == nullptr);
+#if GODOT_4_7_OR_NEWER
+        CRASH_COND(p_class_info->gdtype == nullptr);
+        for (const KeyValue<StringName, const MethodInfo*>& pair : p_class_info->gdtype->get_signal_map(true))
+        {
+            CRASH_COND(pair.value == nullptr);
+            p_callable(pair.key, *pair.value);
+        }
+#else
+        for (const KeyValue<StringName, MethodInfo>& pair : p_class_info->signal_map)
+        {
+            p_callable(pair.key, pair.value);
+        }
+#endif
+    }
+
+    // p_callable: void (const StringName& p_enum_name, const EnumInfoCompat& p_enum_info)
+    template <typename TCallable>
+    jsb_force_inline void for_each_class_enum(const ClassDB::ClassInfo* p_class_info, const TCallable& p_callable)
+    {
+        CRASH_COND(p_class_info == nullptr);
+#if GODOT_4_7_OR_NEWER
+        CRASH_COND(p_class_info->gdtype == nullptr);
+        for (const KeyValue<StringName, const GDType::EnumInfo*>& pair : p_class_info->gdtype->get_enum_map(true))
+        {
+            CRASH_COND(pair.value == nullptr);
+            p_callable(pair.key, *pair.value);
+        }
+#else
+        for (const KeyValue<StringName, ClassDB::ClassInfo::EnumInfo>& pair : p_class_info->enum_map)
+        {
+            EnumInfoCompat enum_info;
+            enum_info.name = pair.key;
+            enum_info.is_bitfield = pair.value.is_bitfield;
+            for (const StringName& constant_name : pair.value.constants)
+            {
+                const int64_t* constant_value = p_class_info->constant_map.getptr(constant_name);
+                CRASH_COND(constant_value == nullptr);
+                enum_info.values.append(KeyValue<StringName, int64_t>(constant_name, *constant_value));
+            }
+            p_callable(pair.key, enum_info);
+        }
+#endif
+    }
+}
+#endif // !JSB_GDEXTENSION
+
 #endif

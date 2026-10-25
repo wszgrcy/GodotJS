@@ -28,7 +28,7 @@ env:
     debug_symbols=no
     d3d12=yes
     "angle_libs=${{ github.workspace }}/"
-    "accesskit_sdk_path=${{ github.workspace }}/accesskit-c-0.${{ inputs.version_mm == '4.5' && '17' || '18' }}.0/"
+    "accesskit_sdk_path=${{ github.workspace }}/${{ inputs.version_mm == '4.5' && 'accesskit-c-0.17.0' || (inputs.version_mm == '4.6' && 'accesskit-c-0.18.0' || 'accesskit-c-0.22.3') }}"
     skip_js_runtime=yes
   SCONS_CACHE_MSVC_CONFIG: true
   PYTHONIOENCODING: utf8
@@ -122,6 +122,19 @@ jobs:
       - name: Extract pre-built AccessKit v18 [4.6]
         if: inputs.version_mm == '4.6'
         run: unzip -o accesskit-c-0.18.0/accesskit_c.zip
+
+      - name: Download pre-built AccessKit 0.22.3 [4.7]
+        if: inputs.version_mm == '4.7'
+        uses: dsaltares/fetch-gh-release-asset@1.1.2
+        with:
+          repo: godotengine/godot-accesskit-c-static
+          version: tags/0.22.3
+          file: accesskit-c-0.22.3.zip
+          target: accesskit_c.zip
+
+      - name: Extract pre-built AccessKit 0.22.3 [4.7]
+        if: inputs.version_mm == '4.7'
+        run: unzip -o accesskit_c.zip
 
       - name: Compilation
         uses: ./.github/actions/godot-build

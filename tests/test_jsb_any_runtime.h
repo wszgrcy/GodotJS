@@ -5,6 +5,8 @@
 #include "../bridge/jsb_essentials.h"
 #include "../bridge/jsb_object_db.h"
 #include "../bridge/jsb_type_convert.h"
+#include "../compat/jsb_engine_compat.h"
+#include "scene/resources/atlas_texture.h"
 
 #define JSB_TESTS_OPTION_ENABLED(OptionName) kOption_##OptionName
 #define JSB_TESTS_OPTION_DEFINE(OptionName, IsEnabled) enum { kOption_##OptionName = IsEnabled };
@@ -504,7 +506,8 @@ console.assert(!gd.is_instance_valid(inst));
 
     TEST_CASE("[jsb] RefCounted objects")
     {
-        WeakRef* weak_ref = memnew(WeakRef);
+        // `Ref` owns the object on any engine version (4.7's `memnew` already returns a `Ref` for `RefCounted`s)
+        Ref<WeakRef> weak_ref = memnew(WeakRef);
         {
             GodotJSScriptLanguageIniter initer;
 
@@ -535,7 +538,172 @@ file = undefined;
         }
         // There is no strong reference anymore, therefore the FileAccess object should have been deleted by JS GC.
         CHECK(weak_ref->get_ref().is_null());
-        memdelete(weak_ref);
+    }
+
+    /**
+     * 4.6 kept the enums, the signals and the integer constants of a class in
+     * `ClassDB::ClassInfo`, 4.7 moved them into `GDType`, where the accessors include
+     * inherited members unless `p_no_inheritance` is passed. Both engines must report
+     * only what the class declares itself: inherited members reach JavaScript through
+     * the prototype chain. Reporting them per class instead inflated the generated
+     * typings by several times and produced entries whose documentation is filed under
+     * the declaring class, so they came out without any comment.
+     */
+    TEST_CASE("[jsb] compat class members - only what the class declares")
+    {
+        const ClassDB::ClassInfo* control = ClassDB::classes.getptr("Control");
+        const ClassDB::ClassInfo* node = ClassDB::classes.getptr("Node");
+        REQUIRE(control != nullptr);
+        REQUIRE(node != nullptr);
+
+        // `LayoutPreset` and `gui_input` are declared by Control, `ProcessMode` and
+        // `child_entered_tree` are declared by Node, which Control inherits from.
+        size_t enum_count = 0;
+        bool own_enum_found = false;
+        bool inherited_enum_found = false;
+        jsb::compat::for_each_class_enum(control, [&](const StringName& p_enum_name, const jsb::compat::EnumInfoCompat& p_enum_info)
+        {
+            enum_count++;
+            own_enum_found = own_enum_found || p_enum_name == "LayoutPreset";
+            inherited_enum_found = inherited_enum_found || p_enum_name == "ProcessMode";
+            // the values must survive the trip, 4.6 keeps them apart from the names
+            if (p_enum_name == "LayoutPreset")
+            {
+                CHECK(p_enum_info.values.is_empty() == false);
+            }
+        });
+        CHECK(own_enum_found);
+        CHECK(inherited_enum_found == false);
+        CHECK(enum_count == jsb::compat::get_class_enum_count(control));
+
+        size_t signal_count = 0;
+        bool own_signal_found = false;
+        bool inherited_signal_found = false;
+        jsb::compat::for_each_class_signal(control, [&](const StringName& p_signal_name, const MethodInfo&)
+        {
+            signal_count++;
+            own_signal_found = own_signal_found || p_signal_name == "gui_input";
+            inherited_signal_found = inherited_signal_found || p_signal_name == "child_entered_tree";
+        });
+        CHECK(own_signal_found);
+        CHECK(inherited_signal_found == false);
+        CHECK(signal_count == jsb::compat::get_class_signal_count(control));
+
+        CHECK(jsb::compat::get_class_constants(control).getptr("PROCESS_MODE_INHERIT") == nullptr);
+        CHECK(jsb::compat::get_class_constants(node).getptr("PROCESS_MODE_INHERIT") != nullptr);
+    }
+
+    /**
+     * Cross-checks every compat accessor against the engine's own public `ClassDB` calls,
+     * asked with `p_no_inheritance = true` (the set the compat layer promises to report).
+     * A wrong container, a wrong flag or a lost enum value shows up here.
+     */
+    static void check_class_against_classdb(const StringName& p_class_name)
+    {
+        const ClassDB::ClassInfo* class_info = ClassDB::classes.getptr(p_class_name);
+        REQUIRE(class_info != nullptr);
+
+        CAPTURE(p_class_name);
+        CHECK(jsb::compat::get_class_name(class_info) == p_class_name);
+        CHECK(jsb::compat::get_class_super_name(class_info) == ClassDB::get_parent_class(p_class_name));
+
+        // enums: same names, same bitfield flag, and every constant carries its real value
+        List<StringName> expected_enums;
+        ClassDB::get_enum_list(p_class_name, &expected_enums, true);
+        HashSet<StringName> expected_enum_names;
+        for (const StringName& enum_name : expected_enums)
+        {
+            expected_enum_names.insert(enum_name);
+        }
+        CHECK((size_t)expected_enum_names.size() == jsb::compat::get_class_enum_count(class_info));
+
+        HashSet<StringName> visited_enums;
+        jsb::compat::for_each_class_enum(class_info, [&](const StringName& p_enum_key, const jsb::compat::EnumInfoCompat& p_enum_info)
+        {
+            CAPTURE(p_enum_key);
+            CHECK(visited_enums.insert(p_enum_key));                       // reported exactly once
+            CHECK(expected_enum_names.has(p_enum_key));                    // declared by this class
+            CHECK(p_enum_info.is_bitfield == ClassDB::is_enum_bitfield(p_class_name, p_enum_key, true));
+            CHECK(p_enum_info.values.is_empty() == false);
+            for (const KeyValue<StringName, int64_t>& pair : p_enum_info.values)
+            {
+                CAPTURE(pair.key);
+                bool known = false;
+                const int64_t expected_value = ClassDB::get_integer_constant(p_class_name, pair.key, &known);
+                CHECK(known);
+                CHECK(expected_value == pair.value);
+            }
+        });
+        CHECK((size_t)visited_enums.size() == (size_t)expected_enums.size());
+
+        // signals: same set, and the `MethodInfo` really belongs to that name
+        List<MethodInfo> expected_signals;
+        ClassDB::get_signal_list(p_class_name, &expected_signals, true);
+        CHECK((size_t)expected_signals.size() == jsb::compat::get_class_signal_count(class_info));
+
+        HashSet<StringName> visited_signals;
+        jsb::compat::for_each_class_signal(class_info, [&](const StringName& p_signal_key, const MethodInfo& p_info)
+        {
+            CAPTURE(p_signal_key);
+            CHECK(visited_signals.insert(p_signal_key));
+            CHECK(p_info.name == p_signal_key);
+        });
+        CHECK((size_t)visited_signals.size() == (size_t)expected_signals.size());
+
+        // integer constants: same set, same values
+        List<String> expected_constants;
+        ClassDB::get_integer_constant_list(p_class_name, &expected_constants, true);
+        const jsb::compat::JsbConstantMap& constants = jsb::compat::get_class_constants(class_info);
+        CHECK((size_t)expected_constants.size() == constants.size());
+        for (const String& constant_name : expected_constants)
+        {
+            CAPTURE(constant_name);
+            const int64_t* found = constants.getptr(constant_name);
+            REQUIRE(found != nullptr);
+            CHECK(*found == ClassDB::get_integer_constant(p_class_name, constant_name));
+        }
+    }
+
+    TEST_CASE("[jsb] compat views match the ClassDB ground truth - every class")
+    {
+        LocalVector<StringName> all_classes;
+        ClassDB::get_class_list(all_classes);
+        REQUIRE(all_classes.size() > 500);
+
+        size_t classes_with_enums = 0;
+        for (const StringName& class_name : all_classes)
+        {
+            if (const ClassDB::ClassInfo* info = ClassDB::classes.getptr(class_name))
+            {
+                classes_with_enums += jsb::compat::get_class_enum_count(info) > 0 ? 1 : 0;
+            }
+            check_class_against_classdb(class_name);
+        }
+        // guards against the loop silently checking nothing
+        CHECK(classes_with_enums > 50);
+    }
+
+    TEST_CASE("[jsb] [SceneTree] ButtonCompat::set_icon sets the icon the button shows")
+    {
+        Button* button = memnew(Button);
+        Ref<Texture2D> icon = memnew(AtlasTexture);
+
+        jsb::ButtonCompat::set_icon(button, icon);
+#if GODOT_4_4_OR_NEWER
+        CHECK(button->get_button_icon() == icon);
+#else
+        CHECK(button->get_icon() == icon);
+#endif
+
+        // clearing must work the same way on both engines
+        jsb::ButtonCompat::set_icon(button, Ref<Texture2D>());
+#if GODOT_4_4_OR_NEWER
+        CHECK(button->get_button_icon().is_null());
+#else
+        CHECK(button->get_icon().is_null());
+#endif
+
+        memdelete(button);
     }
 }
 

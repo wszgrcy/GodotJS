@@ -24,7 +24,7 @@ env:
     warnings=extra
     strict_checks=yes
     module_text_server_fb_enabled=yes
-    "accesskit_sdk_path=${{ github.workspace }}/accesskit-c-0.${{ inputs.version_mm == '4.5' && '17' || '18' }}.0/"
+    "accesskit_sdk_path=${{ github.workspace }}/${{ inputs.version_mm == '4.5' && 'accesskit-c-0.17.0' || (inputs.version_mm == '4.6' && 'accesskit-c-0.18.0' || 'accesskit-c-0.22.3') }}"
     skip_js_runtime=yes
 #  ASAN_OPTIONS: color=always:print_suppressions=1:suppressions=${{ github.workspace }}/misc/error_suppressions/asan.txt
 #  LSAN_OPTIONS: color=always:print_suppressions=1:suppressions=${{ github.workspace }}/misc/error_suppressions/lsan.txt
@@ -111,6 +111,19 @@ jobs:
       - name: Extract pre-built AccessKit v18 [4.6]
         if: inputs.version_mm == '4.6'
         run: unzip -o accesskit-c-0.18.0/accesskit_c.zip
+
+      - name: Download pre-built AccessKit 0.22.3 [4.7]
+        if: inputs.version_mm == '4.7'
+        uses: dsaltares/fetch-gh-release-asset@1.1.2
+        with:
+          repo: godotengine/godot-accesskit-c-static
+          version: tags/0.22.3
+          file: accesskit-c-0.22.3.zip
+          target: accesskit_c.zip
+
+      - name: Extract pre-built AccessKit 0.22.3 [4.7]
+        if: inputs.version_mm == '4.7'
+        run: unzip -o accesskit_c.zip
 
       - name: Compilation
         uses: ./.github/actions/godot-build

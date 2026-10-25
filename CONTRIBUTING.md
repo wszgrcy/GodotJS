@@ -5,7 +5,7 @@
 - Clone the source code of [godot](https://github.com/godotengine/godot):
     - `git clone git@github.com:godotengine/godot.git` or
     - `git clone https://github.com/godotengine/godot.git`
-- This branch uses version `4.5` so checkout the version with: `git checkout 4.5`
+- This branch uses version `4.7` so checkout the version with: `git checkout 4.7`
 - Clone this module and put it into `godot/modules/GodotJS`:
     - `git clone git@github.com:godotjs/GodotJS.git godot/modules/GodotJS` or
     - `git clone https://github.com/godotjs/GodotJS.git godot/modules/GodotJS`

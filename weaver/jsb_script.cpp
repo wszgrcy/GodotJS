@@ -471,12 +471,14 @@ bool GodotJSScript::has_static_method(const StringName& p_method) const
     return false;
 }
 
+#if !GODOT_4_7_OR_NEWER
 bool GodotJSScript::instance_has(const Object* p_this) const
 {
     jsb_check(loaded_);
     MutexLock lock(GodotJSScriptLanguage::get_singleton()->mutex_);
     return instances_.has(const_cast<Object*>(p_this));
 }
+#endif // !GODOT_4_7_OR_NEWER
 
 Error GodotJSScript::load_source_code(const String &p_path)
 {

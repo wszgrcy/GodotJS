@@ -82,7 +82,10 @@ public:
     virtual ScriptInstance* instance_create(Object* p_this) override { return instance_construct(p_this, true); }
 
     virtual PlaceHolderScriptInstance* placeholder_instance_create(Object* p_this) override;
+#if !GODOT_4_7_OR_NEWER
+    // no longer virtual in 4.7 (deprecated in favour of `Object::get_script()`), so it cannot be overridden
     virtual bool instance_has(const Object* p_this) const override;
+#endif
 
     virtual bool has_source_code() const override { return !source_.is_empty(); }
     virtual String get_source_code() const override { return source_; }

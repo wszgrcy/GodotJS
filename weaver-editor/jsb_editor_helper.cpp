@@ -9,6 +9,13 @@
 #include "scene/animation/animation_mixer.h"
 #include "scene/resources/packed_scene.h"
 
+// 4.7 changed the output container of the animation list getters
+#if GODOT_4_7_OR_NEWER
+    using AnimationNameList = LocalVector<StringName>;
+#else
+    using AnimationNameList = List<StringName>;
+#endif
+
 // The following enums must be kept in sync with jsb.editor.codegen.ts
 enum class CodeGenType {
     ScriptNodeTypeDescriptor,
@@ -159,7 +166,7 @@ Dictionary GodotJSEditorHelper::_build_node_type_descriptor(jsb::JSEnvironment& 
 
             if (animation_mixer)
             {
-                List<StringName> library_names;
+                AnimationNameList library_names;
                 animation_mixer->get_animation_library_list(&library_names);
 
                 Dictionary animation_libraries_object_literal;
@@ -173,7 +180,7 @@ Dictionary GodotJSEditorHelper::_build_node_type_descriptor(jsb::JSEnvironment& 
 
                     Array animation_names_union_array;
 
-                    List<StringName> animation_names;
+                    AnimationNameList animation_names;
                     library->get_animation_list(&animation_names);
 
                     for (const StringName& animation_name : animation_names)
