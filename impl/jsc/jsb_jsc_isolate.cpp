@@ -4,6 +4,11 @@
 #include "jsb_jsc_handle.h"
 #include "jsb_jsc_context.h"
 
+// Godot 4.7 moved the bit helpers out of the global namespace and into Math.
+#if GODOT_4_7_OR_NEWER
+#define nearest_shift Math::nearest_shift
+#endif
+
 #define JSB_JSC_DEFINE_ATOM_BEGIN() int _atom_index_gen_ = 0
 #define JSB_JSC_DEFINE_ATOM(AtomName) \
     jsb_check(jsb::impl::JS_ATOM_##AtomName == _atom_index_gen_); \
