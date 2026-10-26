@@ -1,12 +1,14 @@
 name: 🔗 GHA
 
-# Only run pipeline on open pull_requests and main + releases
+# Only run pipeline on open pull_requests, on pushes to main and to version
+# branches (any branch starting with "v", e.g. v4.7), and on releases.
 # we don't need it on every push and some parameters are not available for push only
 on:
   pull_request:
   push:
     branches:
       - "main"
+      - "v*"
   release:
     types: [ published ]
 
