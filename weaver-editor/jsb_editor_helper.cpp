@@ -343,6 +343,9 @@ Dictionary GodotJSEditorHelper::get_resource_type_descriptor(const String& p_pat
         descriptor[jsb_string_name(name)] = "PackedScene";
         descriptor[jsb_string_name(arguments)] = generic_arguments;
 
+        // 该节点从未加入场景树，这里直接销毁，否则每次 codegen 都会泄漏一份场景实例
+        memdelete(instantiated_scene);
+
         return descriptor;
     }
 
