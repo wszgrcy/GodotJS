@@ -45,13 +45,11 @@ jobs:
 
       - name: ❓ Should publish
         id: should_publish
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          HAS_CHANGESETS: ${{ steps.changesets.outputs.hasChangesets }}
         run: |
-          SHOULD_PUBLISH=$(node scripts/release/should-publish.js)
-          if [[ $SHOULD_PUBLISH == "true" && $HAS_CHANGESETS == "false" ]]; then
-            echo "publish=true" >> $GITHUB_OUTPUT
-          else
+          VERSION="v$(node -p "require('./package.json').version")"
+
+          if [[ -n "$(git ls-remote --tags origin "refs/tags/$VERSION")" ]]; then
             echo "publish=false" >> $GITHUB_OUTPUT
+          else
+            echo "publish=true" >> $GITHUB_OUTPUT
           fi

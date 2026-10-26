@@ -31,7 +31,8 @@ jobs:
 
   engine-version-build:
     name: ⚙️ Build Godot Version with GodotJS
-    needs: [environment]
+    needs: [environment, changesets]
+    if: needs.environment.result == 'success' && (needs.changesets.result == 'success' || needs.changesets.result == 'skipped')
     strategy:
       fail-fast: false
       matrix:
@@ -47,7 +48,7 @@ jobs:
       version: ${{ matrix.version }}
       version_mm: ${{ matrix.version_mm }}
       version_ref: ${{ matrix.version_ref }}
-      release: ${{ github.event_name == 'release' }}
+      release: ${{ needs.changesets.outputs.publish == 'true' || github.event_name == 'release' }}
 
   runtime-matrix:
     name: 🧪 Runtime matrix
@@ -75,7 +76,7 @@ jobs:
   release:
     name: 🦅 Release
     needs: [changesets, builds-done]
-    if: needs.changesets.outputs.publish == 'true'
+    if: needs.changesets.outputs.publish == 'true' || github.event_name == 'release'
     permissions:
       contents: write
     uses: ./.github/workflows/misc_release.yml
@@ -83,20 +84,3 @@ jobs:
     with:
       versions: '4.7.2'
 #      versions: '4.7.2, 4.8'
-
-  upload-assets:
-    name: 📁 Upload Assets
-    needs: [builds-done]
-    if: github.event_name == 'release'
-    permissions:
-      contents: write
-    uses: ./.github/workflows/misc_upload_assets.yml
-    secrets: inherit
-    strategy:
-      fail-fast: true
-      matrix:
-        include:
-          - version: 4.7.2
-#          - version: 4.8dev
-    with:
-      version: ${{ matrix.version }}

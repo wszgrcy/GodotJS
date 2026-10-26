@@ -11,9 +11,8 @@ permissions:
 
 jobs:
   release:
+    name: 🦅 Release
     runs-on: ubuntu-latest
-    outputs:
-      id: ${{ steps.publish_release.outputs.id }}
     steps:
       - name: ⏬ Checkout repo
         uses: actions/checkout@v6
@@ -27,12 +26,40 @@ jobs:
           node-version: 25
           cache: "pnpm"
 
-      - name: 🔄️ Install dependencies
+      - name: 🛠️ Install dependencies
         run: pnpm install
 
-      - name: 🚢 Publish release
-        id: publish_release
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      - name: 🔢 Names
+        id: names
         run: |
-          pnpm ci:publish ${{ inputs.versions }}
+          echo "tag=$(node -p "require('./package.json').version")" >> $GITHUB_OUTPUT
+          echo "artifact=*-${{ inputs.versions }}-*" >> $GITHUB_OUTPUT
+
+      - name: 📝 Release notes
+        run: pnpm ci:publish ${{ inputs.versions }}
+
+      - name: ⏬ Download all builds
+        uses: actions/download-artifact@v8
+        with:
+          pattern: ${{ steps.names.outputs.artifact }}
+          path: dist
+
+      - name: 📦 Pack each build as zip
+        run: |
+          cd dist
+          for dir in */; do
+            name="${dir%/}"
+            ( cd "$name" && zip -qr "../$name.zip" . )
+            rm -rf "$name"
+          done
+          ls -lh
+
+      - name: 🚢 Publish release with assets
+        uses: softprops/action-gh-release@v3
+        with:
+          tag_name: ${{ github.event_name == 'release' && github.event.release.tag_name || steps.names.outputs.tag }}
+          name: ${{ steps.names.outputs.tag }}
+          target_commitish: ${{ github.ref_name }}
+          body_path: release-notes.md
+          files: dist/*.zip
+          overwrite_files: true
