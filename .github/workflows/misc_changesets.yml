@@ -49,7 +49,7 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           HAS_CHANGESETS: ${{ steps.changesets.outputs.hasChangesets }}
         run: |
-          SHOULD_PUBLISH=$(pnpm run ci:should-publish)
+          SHOULD_PUBLISH=$(node scripts/release/should-publish.js)
           if [[ $SHOULD_PUBLISH == "true" && $HAS_CHANGESETS == "false" ]]; then
             echo "publish=true" >> $GITHUB_OUTPUT
           else

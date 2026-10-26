@@ -37,7 +37,9 @@ function publishRelease(godotVersions) {
   const version = getVersion();
   console.log(`Found version:`, version);
 
-  const releaseCommand = `gh release create "${version}" --target main --title "${version}" --notes-file "${releaseNotesPath}"`;
+  // 标签要打在跑流水线的那个分支上（比如 v4.7）；main 只用来同步上游，上面没有本分支的代码。
+  const target = process.env.GITHUB_REF_NAME || "main";
+  const releaseCommand = `gh release create "${version}" --target ${target} --title "${version}" --notes-file "${releaseNotesPath}"`;
   if (process.env.CI) {
     console.log(execSync(releaseCommand).toString());
   } else {
