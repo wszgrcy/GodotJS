@@ -54,9 +54,8 @@ namespace jsb
 #endif
 
     //NOTE ensure the address of p_class_info being locked during this procedure
-    bool _parse_script_class_iterate(const v8::Local<v8::Context>& p_context, const ScriptClassInfoPtr& p_class_info, const v8::Local<v8::Object>& class_obj)
+    bool _parse_script_class_iterate(v8::Isolate* isolate, const v8::Local<v8::Context>& p_context, const ScriptClassInfoPtr& p_class_info, const v8::Local<v8::Object>& class_obj)
     {
-        v8::Isolate* isolate = p_context->GetIsolate();
         Environment* environment = Environment::wrap(isolate);
 
         //TODO collect methods/signals/properties
@@ -316,7 +315,7 @@ namespace jsb
         }
     }
 
-    bool ScriptClassInfo::_parse_script_class(const v8::Local<v8::Context>& p_context, JavaScriptModule& p_module)
+    bool ScriptClassInfo::_parse_script_class(v8::Isolate* isolate, const v8::Local<v8::Context>& p_context, JavaScriptModule& p_module)
     {
         if (p_module.exports.IsEmpty())
         {
@@ -330,7 +329,6 @@ namespace jsb
             JSB_LOG(VeryVerbose, "(script-parser) non-res module %s", p_module.source_info.source_filepath);
             return false;
         }
-        v8::Isolate* isolate = p_context->GetIsolate();
         const v8::Local<v8::Value> exports = p_module.exports.Get(isolate);
         if (!exports->IsObject())
         {
@@ -416,7 +414,7 @@ namespace jsb
         jsb_check(existed_class_info->module_id == p_module.id);
         existed_class_info->native_class_id = native_class_id;
 
-        return _parse_script_class_iterate(p_context, existed_class_info, class_obj);
+        return _parse_script_class_iterate(isolate, p_context, existed_class_info, class_obj);
     }
 
 }

@@ -597,7 +597,7 @@ void GodotJSEditorPlugin::_on_generate_completed(const v8::FunctionCallbackInfo<
         return;
     }
 
-    std::function<void(bool)>* callback = static_cast<std::function<void(bool)>*>(info.Data().As<v8::External>()->Value());
+    std::function<void(bool)>* callback = static_cast<std::function<void(bool)>*>(info.Data().As<v8::External>()->Value(v8::kExternalPointerTypeTagDefault));
 
     if (callback != nullptr)
     {
@@ -650,7 +650,7 @@ try {
         v8::Local<v8::Context> context = environment->get_context();
         v8::Context::Scope context_scope(context);
         v8::MaybeLocal<v8::Value> func_maybe = jsb::impl::Helper::compile_function(
-            context, code, ::std::size(code) - 1, "generate_types");
+            isolate, context, code, ::std::size(code) - 1, "generate_types");
 
         if (func_maybe.IsEmpty())
         {
@@ -702,7 +702,7 @@ try {
             GodotJSEditorPlugin::get_all_scenes(EditorFileSystem::get_singleton()->get_filesystem(), scene_paths);
             GodotJSEditorPlugin::generate_scene_nodes_types(generate_resources, scene_paths);
         });
-        v8::Local<v8::External> complete_callback = v8::External::New(isolate, heap_complete);
+        v8::Local<v8::External> complete_callback = v8::External::New(isolate, heap_complete, v8::kExternalPointerTypeTagDefault);
 
         v8::Local<v8::Value> argv[] = {
             jsb::impl::Helper::new_string(isolate, "./" JSB_TYPE_ROOT),
@@ -881,7 +881,7 @@ try {
     v8::Context::Scope context_scope(context);
 
     v8::MaybeLocal<v8::Value> func_maybe = jsb::impl::Helper::compile_function(
-        context, code, ::std::size(code) - 1, "generate_resource_type");
+        isolate, context, code, ::std::size(code) - 1, "generate_resource_type");
 
     if (func_maybe.IsEmpty())
     {
@@ -897,7 +897,7 @@ try {
 
     v8::Local<v8::Value> func = func_maybe.ToLocalChecked();
     auto heap_complete = new std::function(complete);
-    v8::Local<v8::External> complete_callback = v8::External::New(isolate, heap_complete);
+    v8::Local<v8::External> complete_callback = v8::External::New(isolate, heap_complete, v8::kExternalPointerTypeTagDefault);
 
     v8::Local<v8::Value> argv[] = {
         jsb::impl::Helper::new_string(isolate, "./" + jsb::internal::Settings::get_autogen_path()),
@@ -957,7 +957,7 @@ try {
     v8::Context::Scope context_scope(context);
 
     v8::MaybeLocal<v8::Value> func_maybe = jsb::impl::Helper::compile_function(
-        context, code, ::std::size(code) - 1, "generate_resource_type");
+        isolate, context, code, ::std::size(code) - 1, "generate_resource_type");
 
     if (func_maybe.IsEmpty())
     {
@@ -973,7 +973,7 @@ try {
 
     v8::Local<v8::Value> func = func_maybe.ToLocalChecked();
     auto heap_complete = new std::function(complete);
-    v8::Local<v8::External> complete_callback = v8::External::New(isolate, heap_complete);
+    v8::Local<v8::External> complete_callback = v8::External::New(isolate, heap_complete, v8::kExternalPointerTypeTagDefault);
 
     v8::Local<v8::Value> argv[] = {
         jsb::impl::Helper::new_string(isolate, "./" + jsb::internal::Settings::get_autogen_path()),

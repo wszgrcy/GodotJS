@@ -6,8 +6,9 @@
 namespace jsb
 {
 #if !JSB_WITH_ESSENTIALS
-    void Essentials::register_(const v8::Local<v8::Context>& context, const v8::Local<v8::Object>& self)
+    void Essentials::register_(v8::Isolate* isolate, const v8::Local<v8::Context>& context, const v8::Local<v8::Object>& self)
     {
+        jsb_unused(isolate);
     }
 #else
     namespace InternalTimerType { enum Type : uint8_t { Interval, Timeout, Immediate, }; }
@@ -242,9 +243,8 @@ namespace jsb
         }
     }
 
-    void Essentials::register_(const v8::Local<v8::Context>& context, const v8::Local<v8::Object>& self)
+    void Essentials::register_(v8::Isolate* isolate, const v8::Local<v8::Context>& context, const v8::Local<v8::Object>& self)
     {
-        v8::Isolate* isolate = context->GetIsolate();
 
         // minimal console functions support
         {

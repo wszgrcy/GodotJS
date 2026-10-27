@@ -50,14 +50,35 @@ jsb_platform = "linux" if env["platform"] == "linuxbsd" else env["platform"]
 jsb_arch = env["arch"]
 
 # Dependencies
-# 12.6.228.49 is the newest V8 an embedder can still compile as C++17 (Godot builds
-# modules with -std=gnu++17); from 12.7.224.1 up v8config.h demands C++20.
-deps_release_tag = "1.3.2"
-deps_v8_version = "12.6.228.49"
+# V8 15 refuses to be compiled as C++17: v8config.h has a hard `#error` for
+# `__cplusplus <= 201703L` and no macro turns it off, so the module env gets
+# `-std=gnu++20` further down in this file (Godot itself stays on gnu++17).
+deps_release_tag = "1.4.0"
+deps_v8_version = "15.7.112.12"
 deps_lws_version = "4.3"
 deps_url = "https://github.com/wszgrcy/GodotJS-Dependencies/releases"
 module_path = os.path.dirname(os.path.abspath("jsb.h"))
 module_name = os.path.basename(module_path)
+
+# Where to look for the prebuilt archives before reaching out to `deps_url`.
+# The 15.x packages are produced by a checkout of GodotJS-Dependencies; while
+# they are not published to a release yet, point that checkout's `dist/`
+# directory here and the build reads the zip straight off the disk:
+#   GODOTJS_DEPS_DIR=/path/to/GodotJS-Dependencies/dist scons ...
+# Otherwise a checkout sitting next to the engine source is picked up, and if
+# neither exists the archive is downloaded from `deps_url` as before.
+def _find_local_deps_dir():
+    candidates = [os.environ.get("GODOTJS_DEPS_DIR", "")]
+    candidates += [
+        os.path.join(module_path, "..", "..", "GodotJS-Dependencies", "dist"),
+        os.path.join(module_path, "..", "GodotJS-Dependencies", "dist"),
+    ]
+    for candidate in candidates:
+        if candidate and os.path.isdir(candidate):
+            return os.path.abspath(candidate)
+    return ""
+
+deps_local_dir = _find_local_deps_dir()
 
 # godot 4.3.1 generates `ActiveProjectItemList_` variable name with the path name (see methods.py)
 # it'll fail if the path contains '.' or any other characters invalid as variable name
@@ -148,24 +169,30 @@ def read_macro_value(name, def_val = None):
     raise ValueError(f"no {name} defined in jsb.config.h")
 
 def download_dependency(name, version, target_dir):
-    '''Downloads and extracts a dependency if the target directory does not exist.'''
+    '''Installs a prebuilt dependency if the target directory does not exist.'''
     if os.path.exists(target_dir):
         return
 
     filename = f"{name}_{version}.zip"
     url = f"{deps_url}/download/{deps_release_tag}/{filename}"
+    local_path = os.path.join(deps_local_dir, filename) if deps_local_dir else ""
 
     print_info(f"Dependency '{name}' not found at '{target_dir}'.")
-    print_info(f"Downloading {filename} from {url} ...")
 
     try:
-        urllib.request.urlretrieve(url, filename)
+        if local_path and os.path.isfile(local_path):
+            print_info(f"Using {local_path} ...")
+            archive = local_path
+        else:
+            print_info(f"Downloading {filename} from {url} ...")
+            urllib.request.urlretrieve(url, filename)
+            archive = filename
 
         print_info(f"Extracting {filename} ...")
-        with zipfile.ZipFile(filename, 'r') as zip_ref:
+        with zipfile.ZipFile(archive, 'r') as zip_ref:
             zip_ref.extractall(".")
 
-        if os.path.exists(filename):
+        if archive == filename and os.path.exists(filename):
             os.remove(filename)
 
         if not os.path.exists(target_dir):
@@ -506,6 +533,40 @@ if v8_support is not None:
         env.Append(LIBS=[File(v8_lib_path)])
     else:
         check(False, f'v8 is not supported on {env["platform"]}')
+
+    # V8 15.x headers demand C++20 (include/v8config.h errors out on anything
+    # older). Godot prepends `-std=gnu++17` / `/std:c++17` in SConstruct, so the
+    # module has to override it for its own sources.
+    if env.msvc:
+        # two /std: flags would fight each other, so drop the engine's one first
+        if "/std:c++17" in env_jsb["CXXFLAGS"]:
+            env_jsb["CXXFLAGS"].remove("/std:c++17")
+        env_jsb.Append(CXXFLAGS=["/std:c++20"])
+    else:
+        # appended, so it wins over the prepended -std=gnu++17
+        env_jsb.Append(CXXFLAGS=["-std=gnu++20"])
+
+    # V8 15.x performs 128-bit compare-and-swap on objects that are only 8 bytes
+    # aligned, so the compiler emits calls to the generic __atomic_* helpers
+    # instead of a `cmpxchg16b` instruction. Those live in libatomic, which is not
+    # part of the monolith. Apple toolchains do not ship libatomic, so they are
+    # left alone until a build proves they need it.
+    if jsb_platform in ["linux", "android"] and not env.msvc:
+        env.Append(LIBS=["atomic"])
+
+    # Godot generates modules_tests.gen.h from every modules/*/tests/*.h and includes
+    # it from tests/test_main.cpp, so our test headers land in a translation unit that
+    # is built with the engine's own flags and sees the V8 headers too. tests/SCsub
+    # runs after the modules and shares this construction environment, so widening it
+    # here is the only way a module can reach that file. Builds without tests= are
+    # untouched.
+    if env["tests"]:
+        if env.msvc:
+            if "/std:c++17" in env["CXXFLAGS"]:
+                env["CXXFLAGS"].remove("/std:c++17")
+            env.Append(CXXFLAGS=["/std:c++20"])
+        else:
+            env.Append(CXXFLAGS=["-std=gnu++20"])
 
     # platform-specific defines
     if jsb_platform == "windows":

@@ -13,8 +13,9 @@ namespace jsb::impl
     {
     public:
         // deleter for valuetype optimization (no ObjectHandle needed)
-        static void SetDeleter(Variant* p_pointer, const v8::Local<v8::Object> value, const v8::WeakCallbackInfo<void>::Callback callback, void *deleter_data)
+        static void SetDeleter(v8::Isolate* isolate, Variant* p_pointer, const v8::Local<v8::Object> value, const v8::WeakCallbackInfo<void>::Callback callback, void *deleter_data)
         {
+            jsb_unused(isolate);
             Broker::SetWeak(value.data_.isolate_, (JSValue) value, deleter_data, (void*) callback);
         }
 
@@ -227,10 +228,10 @@ namespace jsb::impl
             return v8::Number::New(isolate, (double) p_val);
         }
 
-        static v8::MaybeLocal<v8::Value> compile_function(const v8::Local<v8::Context>& context, const char* p_source, int p_source_len, const String& p_filename)
+        static v8::MaybeLocal<v8::Value> compile_function(v8::Isolate* isolate, const v8::Local<v8::Context>& context, const char* p_source, int p_source_len, const String& p_filename)
         {
             jsb_checkf(p_source[p_source_len] == '\0', "JS_Eval needs a zero-terminated string as input to evaluate");
-            v8::Isolate* isolate = context->GetIsolate();
+            jsb_unused(context);
             JSContext* ctx = isolate->ctx();
             const CharString filename = p_filename.utf8();
             constexpr int flags = JS_EVAL_TYPE_GLOBAL | JS_EVAL_FLAG_STRICT;
@@ -243,9 +244,9 @@ namespace jsb::impl
             return v8::MaybeLocal<v8::Value>(v8::Data(isolate, isolate->push_steal(rval)));
         }
 
-        static v8::MaybeLocal<v8::Value> eval(const v8::Local<v8::Context>& context, const char* p_source, int p_source_len, const String& p_filename)
+        static v8::MaybeLocal<v8::Value> eval(v8::Isolate* isolate, const v8::Local<v8::Context>& context, const char* p_source, int p_source_len, const String& p_filename)
         {
-            return compile_function(context, p_source, p_source_len, p_filename);
+            return compile_function(isolate, context, p_source, p_source_len, p_filename);
         }
 
         jsb_force_inline static void free(uint8_t* data)

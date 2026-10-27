@@ -14,9 +14,9 @@ namespace jsb::impl
         Helper() = delete;
 
         // deleter for valuetype optimization (no ObjectHandle needed)
-        static void SetDeleter(Variant* p_pointer, const v8::Local<v8::Object> p_object, v8::BackingStore::DeleterCallback callback, void *deleter_data)
+        // V8 15.x no longer hands out the isolate through the object, so the caller passes it in
+        static void SetDeleter(v8::Isolate* isolate, Variant* p_pointer, const v8::Local<v8::Object> p_object, v8::BackingStore::DeleterCallback callback, void *deleter_data)
         {
-            v8::Isolate* isolate = p_object->GetIsolate();
             p_object->Set(isolate->GetCurrentContext(), 0,
                 // in this way, the scavenger could gc it efficiently
                 v8::ArrayBuffer::New(isolate, v8::ArrayBuffer::NewBackingStore(p_pointer, sizeof(Variant), callback, deleter_data))
@@ -156,9 +156,8 @@ namespace jsb::impl
          * \param p_source_origin SourceOrigin (compile the code snippet without ScriptOrigin if `p_filename` is empty)
          * \return js rval
          */
-        static v8::MaybeLocal<v8::Value> compile_function(const v8::Local<v8::Context>& context, const char* p_source, int p_source_len, const String& p_source_origin)
+        static v8::MaybeLocal<v8::Value> compile_function(v8::Isolate* isolate, const v8::Local<v8::Context>& context, const char* p_source, int p_source_len, const String& p_source_origin)
         {
-            v8::Isolate* isolate = context->GetIsolate();
             v8::MaybeLocal<v8::Script> script;
             const v8::Local<v8::String> source = v8::String::NewFromUtf8(isolate, p_source, v8::NewStringType::kNormal, p_source_len).ToLocalChecked();
 
@@ -220,9 +219,9 @@ namespace jsb::impl
             return maybe_value;
         }
 
-        static v8::MaybeLocal<v8::Value> eval(const v8::Local<v8::Context>& context, const char* p_source, int p_source_len, const String& p_filename)
+        static v8::MaybeLocal<v8::Value> eval(v8::Isolate* isolate, const v8::Local<v8::Context>& context, const char* p_source, int p_source_len, const String& p_filename)
         {
-            return compile_function(context, p_source, p_source_len, p_filename);
+            return compile_function(isolate, context, p_source, p_source_len, p_filename);
         }
 
         template<int N>

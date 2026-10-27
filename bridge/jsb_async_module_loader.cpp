@@ -15,7 +15,7 @@ namespace jsb
 
             jsb_check(!info.Data().IsEmpty() && info.Data()->IsUint32());
             const AsyncModuleToken token(info.Data().As<v8::Uint32>()->Value());
-            env->get_async_module_manager()._mark_as_handled(context, token, is_fulfilled, info[0]);
+            env->get_async_module_manager()._mark_as_handled(isolate, context, token, is_fulfilled, info[0]);
         }
     }
 

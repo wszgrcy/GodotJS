@@ -1168,7 +1168,7 @@ namespace jsb
             return;
         }
 
-        const Worker* worker = (Worker*) self->GetAlignedPointerFromInternalField(IF_Pointer);
+        const Worker* worker = (Worker*) self->GetAlignedPointerFromInternalField(IF_Pointer, v8::kEmbedderDataTypeTagDefault);
 
         if (!worker || !Worker::is_valid(worker->id_))
         {
@@ -1291,7 +1291,7 @@ namespace jsb
             jsb_throw(isolate, "bad this");
             return;
         }
-        const Worker* worker = (Worker*) self->GetAlignedPointerFromInternalField(IF_Pointer);
+        const Worker* worker = (Worker*) self->GetAlignedPointerFromInternalField(IF_Pointer, v8::kEmbedderDataTypeTagDefault);
         if (!Worker::terminate(worker->id_))
         {
             JSB_WORKER_LOG(Warning, "can not terminate a dead worker");
@@ -1335,12 +1335,13 @@ namespace jsb
 #endif
         };
 
-        jsb_force_inline bool visited_matches(const VisitedEntry& entry, const v8::Local<v8::Object>& obj)
+        jsb_force_inline bool visited_matches(v8::Isolate* isolate, const VisitedEntry& entry, const v8::Local<v8::Object>& obj)
         {
 #if JSB_WITH_QUICKJS
+            jsb_unused(isolate);
             return entry.original_identity == quickjs_object_identity(obj);
 #else
-            return entry.original.Get(obj->GetIsolate()) == obj;
+            return entry.original.Get(isolate) == obj;
 #endif
         }
 
@@ -1416,7 +1417,7 @@ namespace jsb
 
             for (const auto& entry : visited)
             {
-                if (visited_matches(entry, obj))
+                if (visited_matches(isolate, entry, obj))
                 {
                     return visited_replacement(isolate, entry);
                 }

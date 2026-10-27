@@ -30,6 +30,10 @@ namespace v8
         void* Value() const;
 
         static Local<External> New(Isolate* isolate, void* value);
+        // V8 15 tags v8::External; the tag means nothing here, so these overloads
+        // just forward to the untagged ones.
+        void* Value(ExternalPointerTypeTag tag) const { return Value(); }
+        static Local<External> New(Isolate* isolate, void* value, ExternalPointerTypeTag tag) { return New(isolate, value); }
     };
 
     class Primitive: public Value {};

@@ -34,7 +34,7 @@ namespace jsb
             NativeClassID class_id;
             const NativeClassInfoPtr class_info = environment->expose_godot_primitive_class(GetTypeInfo<T>::VARIANT_TYPE, &class_id);
             jsb_check(class_id);
-            const v8::Local<v8::Object> inst = class_info->clazz.NewInstance(context);
+            const v8::Local<v8::Object> inst = class_info->clazz.NewInstance(isolate, context);
             jsb_check(TypeConvert::is_variant(inst.As<v8::Object>()));
 
             // the lifecycle will be managed by javascript runtime, DO NOT DELETE it externally
@@ -320,7 +320,7 @@ namespace jsb
             if (new_target->Get(context, jsb_symbol(environment, ConstructorBindObject)).ToLocal(&bind_object_value) && bind_object_value->IsExternal())
             {
                 JSB_LOG(Verbose, "binding to JS instance to existing native object. %s(%d)", class_name, class_id);
-                environment->bind_godot_object(class_id, (Object*) bind_object_value.As<v8::External>()->Value(), self);
+                environment->bind_godot_object(class_id, (Object*) bind_object_value.As<v8::External>()->Value(v8::kExternalPointerTypeTagDefault), self);
                 return;
             }
 

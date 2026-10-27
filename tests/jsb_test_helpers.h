@@ -62,13 +62,19 @@ namespace jsb::tests
     {
     private:
         v8::Isolate* isolate_;
+        v8::Isolate::Scope isolate_scope_;
         v8::HandleScope handle_scope_;
         v8::Local<v8::Context> context_;
         v8::Context::Scope context_scope_;
 
     public:
+        // V8 15 needs the isolate entered before anything is done with it, so this
+        // scope enters it. Re-entering an isolate that is already entered on the
+        // same thread is allowed (V8 just bumps a counter), so code under test that
+        // enters it again is fine.
         V8ContextScope(v8::Isolate* isolate)
         : isolate_(isolate)
+        , isolate_scope_(isolate)
         , handle_scope_(isolate)
         , context_(isolate->GetCurrentContext())
         , context_scope_(isolate->GetCurrentContext())
@@ -76,6 +82,7 @@ namespace jsb::tests
 
         V8ContextScope(jsb::Environment* env)
         : isolate_(env->get_isolate())
+        , isolate_scope_(env->get_isolate())
         , handle_scope_(env->get_isolate())
         , context_(env->get_context())
         , context_scope_(env->get_context())

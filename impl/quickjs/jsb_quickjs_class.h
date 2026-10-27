@@ -46,9 +46,9 @@ namespace jsb::impl
         }
 
         //NOTE NewInstance should not trigger the underlying native constructor of this class
-        jsb_force_inline v8::Local<v8::Object> NewInstance(const v8::Local<v8::Context> context) const
+        jsb_force_inline v8::Local<v8::Object> NewInstance(v8::Isolate* isolate, const v8::Local<v8::Context> context) const
         {
-            v8::Isolate* isolate = context->GetIsolate();
+            jsb_unused(context);
             JSContext* ctx = isolate->ctx();
             // const JSValue inst = JS_CallConstructor(ctx, (JSValue) constructor_, 0, nullptr);
             // jsb_check(!JS_IsException(inst));

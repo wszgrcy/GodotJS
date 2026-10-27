@@ -21,6 +21,10 @@ namespace v8
 
         void* GetAlignedPointerFromEmbedderData(int index) const;
         void SetAlignedPointerInEmbedderData(int index, void* data);
+        // Same reason as in the Object shim: V8 15 requires a tag, these engines
+        // have none, so the tagged overloads forward to the plain ones.
+        void* GetAlignedPointerFromEmbedderData(int index, EmbedderDataTypeTag tag) const { return GetAlignedPointerFromEmbedderData(index); }
+        void SetAlignedPointerInEmbedderData(int index, void* data, EmbedderDataTypeTag tag) { SetAlignedPointerInEmbedderData(index, data); jsb_unused(tag); }
 
         static Local<Context> New(Isolate* isolate);
         Local<Object> Global() const;

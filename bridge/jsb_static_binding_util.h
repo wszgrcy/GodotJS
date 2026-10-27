@@ -9,7 +9,7 @@
     struct PrimitiveInstanceUtil<Type> {\
         static bool get(v8::Isolate* isolate, const v8::Local<v8::Context>& context, const v8::Local<v8::Object>& p_input, Type*& r_value) {\
             if (!TypeConvert::is_variant(p_input)) return false;\
-            r_value = VariantInternal::ReaderFunc((Variant*) p_input->GetAlignedPointerFromInternalField(IF_Pointer));\
+            r_value = VariantInternal::ReaderFunc((Variant*) p_input->GetAlignedPointerFromInternalField(IF_Pointer, v8::kEmbedderDataTypeTagDefault));\
             return true;\
         }\
     }

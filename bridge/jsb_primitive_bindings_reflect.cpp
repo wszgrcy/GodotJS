@@ -289,7 +289,7 @@ namespace jsb
             v8::Isolate* isolate = info.GetIsolate();
             const v8::Local<v8::Context> context = isolate->GetCurrentContext();
             jsb_check(TypeConvert::is_variant(info.This()));
-            const Variant* p_self = (Variant*)info.This()->GetAlignedPointerFromInternalField(IF_Pointer);
+            const Variant* p_self = (Variant*)info.This()->GetAlignedPointerFromInternalField(IF_Pointer, v8::kEmbedderDataTypeTagDefault);
             const internal::FGetSetInfo& getset = GetVariantInfoCollection(Environment::wrap(context)).getsets[info.Data().As<v8::Int32>()->Value()];
 
             Variant value;
@@ -311,7 +311,7 @@ namespace jsb
             v8::Isolate* isolate = info.GetIsolate();
             const v8::Local<v8::Context> context = isolate->GetCurrentContext();
             jsb_check(TypeConvert::is_variant(info.This()));
-            Variant* p_self = (Variant*) info.This()->GetAlignedPointerFromInternalField(IF_Pointer);
+            Variant* p_self = (Variant*) info.This()->GetAlignedPointerFromInternalField(IF_Pointer, v8::kEmbedderDataTypeTagDefault);
             const internal::FGetSetInfo& getset = GetVariantInfoCollection(Environment::wrap(context)).getsets[info.Data().As<v8::Int32>()->Value()];
 
             Variant value;
@@ -344,7 +344,7 @@ namespace jsb
                 return;
             }
             bool r_valid, r_oob;
-            Variant* self = (Variant*) info.This()->GetAlignedPointerFromInternalField(IF_Pointer);
+            Variant* self = (Variant*) info.This()->GetAlignedPointerFromInternalField(IF_Pointer, v8::kEmbedderDataTypeTagDefault);
             self->set_indexed(index, value, r_valid, r_oob);
             if (!r_valid || r_oob)
             {
@@ -365,7 +365,7 @@ namespace jsb
             }
             const int32_t index = info[0].As<v8::Int32>()->Value();
             bool r_valid, r_oob;
-            const Variant* self = (Variant*) info.This()->GetAlignedPointerFromInternalField(IF_Pointer);
+            const Variant* self = (Variant*) info.This()->GetAlignedPointerFromInternalField(IF_Pointer, v8::kEmbedderDataTypeTagDefault);
             const Variant value = self->get_indexed(index, r_valid, r_oob);
             if (!r_valid || r_oob)
             {
@@ -404,7 +404,7 @@ namespace jsb
                 return;
             }
             bool r_valid;
-            Variant* self = (Variant*) info.This()->GetAlignedPointerFromInternalField(IF_Pointer);
+            Variant* self = (Variant*) info.This()->GetAlignedPointerFromInternalField(IF_Pointer, v8::kEmbedderDataTypeTagDefault);
             self->set_keyed(key, value, r_valid);
             if (!r_valid)
             {
@@ -430,7 +430,7 @@ namespace jsb
                 return;
             }
             bool r_valid;
-            const Variant* self = (Variant*) info.This()->GetAlignedPointerFromInternalField(IF_Pointer);
+            const Variant* self = (Variant*) info.This()->GetAlignedPointerFromInternalField(IF_Pointer, v8::kEmbedderDataTypeTagDefault);
             const Variant value = self->get_keyed(key, r_valid);
             if (!r_valid)
             {
@@ -544,7 +544,7 @@ namespace jsb
             const int method_index = info.Data().As<v8::Int32>()->Value();
             const internal::FBuiltinMethodInfo& method_info = GetVariantInfoCollection(Environment::wrap(context)).methods[method_index];
             Variant* self = TypeConvert::is_variant(info.This())
-                ? (Variant*) info.This()->GetAlignedPointerFromInternalField(IF_Pointer)
+                ? (Variant*) info.This()->GetAlignedPointerFromInternalField(IF_Pointer, v8::kEmbedderDataTypeTagDefault)
                 : nullptr;
             if (!self)
             {

@@ -575,7 +575,7 @@ namespace jsb
             jsb_check((size_t)(int)len == len);
 
             // source evaluator (the module protocol)
-            const v8::MaybeLocal<v8::Value> func_maybe = impl::Helper::compile_function(context, (const char*) source.ptr(), (int) len, source_url);
+            const v8::MaybeLocal<v8::Value> func_maybe = impl::Helper::compile_function(isolate, context, (const char*) source.ptr(), (int) len, source_url);
             if (func_maybe.IsEmpty())
             {
                 static constexpr size_t kDiagnosticPrefixMaxBytes = 192;

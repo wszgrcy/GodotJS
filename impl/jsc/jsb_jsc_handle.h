@@ -2,6 +2,7 @@
 #define GODOTJS_JSC_HANDLE_H
 
 #include "jsb_jsc_pch.h"
+#include "../shared/jsb_v8_pointer_tags.h"
 #include "jsb_jsc_data.h"
 #include "jsb_jsc_broker.h"
 #include "jsb_jsc_ext.h"

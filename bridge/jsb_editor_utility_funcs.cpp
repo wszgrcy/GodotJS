@@ -25,17 +25,17 @@ namespace jsb_private
 #define JSB_TYPE_BEGIN(InType) template<> struct OperatorRegister<InType>\
     {\
         typedef InType CurrentType;\
-        static void generate(const v8::Local<v8::Context>& context, const v8::Local<v8::Array>& operators)\
+        static void generate(v8::Isolate* isolate, const v8::Local<v8::Context>& context, const v8::Local<v8::Array>& operators)\
         {
 #define JSB_TYPE_END() \
         }\
     };
 
-#define JSB_DEFINE_OVERLOADED_BINARY_BEGIN(InOperator) OverloadedBinaryOperator(JSB_OPERATOR_NAME(InOperator), context, operators)
+#define JSB_DEFINE_OVERLOADED_BINARY_BEGIN(InOperator) OverloadedBinaryOperator(JSB_OPERATOR_NAME(InOperator), isolate, context, operators)
 #define JSB_DEFINE_BINARY_OVERLOAD(TReturn, TLeft, TRight) .Define<TReturn, TLeft, TRight>()
 #define JSB_DEFINE_OVERLOADED_BINARY_END() ;
-#define JSB_DEFINE_UNARY(InOperator) UnaryOperator::Define<CurrentType>(context, operators, JSB_OPERATOR_NAME(InOperator));
-#define JSB_DEFINE_COMPARATOR(InOperator) Comparator::Define<CurrentType, CurrentType>(context, operators, JSB_OPERATOR_NAME(InOperator));
+#define JSB_DEFINE_UNARY(InOperator) UnaryOperator::Define<CurrentType>(isolate, context, operators, JSB_OPERATOR_NAME(InOperator));
+#define JSB_DEFINE_COMPARATOR(InOperator) Comparator::Define<CurrentType, CurrentType>(isolate, context, operators, JSB_OPERATOR_NAME(InOperator));
 
 namespace jsb
 {
@@ -541,23 +541,24 @@ namespace jsb
     struct OverloadedBinaryOperator
     {
         String op_name;
+        v8::Isolate* isolate;
         const v8::Local<v8::Context>& context;
         const v8::Local<v8::Array>& operators;
 
-        OverloadedBinaryOperator(const String& p_name, const v8::Local<v8::Context>& p_context, const v8::Local<v8::Array>& p_operators)
-        : op_name(p_name), context(p_context), operators(p_operators) {}
+        OverloadedBinaryOperator(const String& p_name, v8::Isolate* p_isolate, const v8::Local<v8::Context>& p_context, const v8::Local<v8::Array>& p_operators)
+        : op_name(p_name), isolate(p_isolate), context(p_context), operators(p_operators) {}
 
         template<typename TReturn, typename TLeft, typename TRight>
         OverloadedBinaryOperator& Define()
         {
-            JSB_HANDLE_SCOPE(context->GetIsolate());
+            JSB_HANDLE_SCOPE(isolate);
 
-            v8::Local<v8::Object> obj = v8::Object::New(context->GetIsolate());
+            v8::Local<v8::Object> obj = v8::Object::New(isolate);
 
-            set_field(context->GetIsolate(), context, obj, "name", op_name);
-            set_field(context->GetIsolate(), context, obj, "return_type", (int) GetTypeInfo<TReturn>::VARIANT_TYPE);
-            set_field(context->GetIsolate(), context, obj, "left_type", (int) GetTypeInfo<TLeft>::VARIANT_TYPE);
-            set_field(context->GetIsolate(), context, obj, "right_type", (int) GetTypeInfo<TRight>::VARIANT_TYPE);
+            set_field(isolate, context, obj, "name", op_name);
+            set_field(isolate, context, obj, "return_type", (int) GetTypeInfo<TReturn>::VARIANT_TYPE);
+            set_field(isolate, context, obj, "left_type", (int) GetTypeInfo<TLeft>::VARIANT_TYPE);
+            set_field(isolate, context, obj, "right_type", (int) GetTypeInfo<TRight>::VARIANT_TYPE);
             const uint32_t len = operators->Length();
             operators->Set(context, len, obj).Check();
             return *this;
@@ -567,16 +568,16 @@ namespace jsb
     struct UnaryOperator
     {
         template<typename TypeName>
-        static void Define(const v8::Local<v8::Context>& context, const v8::Local<v8::Array>& operators, const String& op_name)
+        static void Define(v8::Isolate* isolate, const v8::Local<v8::Context>& context, const v8::Local<v8::Array>& operators, const String& op_name)
         {
-            JSB_HANDLE_SCOPE(context->GetIsolate());
+            JSB_HANDLE_SCOPE(isolate);
 
-            v8::Local<v8::Object> obj = v8::Object::New(context->GetIsolate());
+            v8::Local<v8::Object> obj = v8::Object::New(isolate);
 
-            set_field(context->GetIsolate(), context, obj, "name", op_name);
-            set_field(context->GetIsolate(), context, obj, "return_type", (int) GetTypeInfo<TypeName>::VARIANT_TYPE);
-            set_field(context->GetIsolate(), context, obj, "left_type", (int) GetTypeInfo<TypeName>::VARIANT_TYPE);
-            set_field(context->GetIsolate(), context, obj, "right_type", (int) Variant::NIL);
+            set_field(isolate, context, obj, "name", op_name);
+            set_field(isolate, context, obj, "return_type", (int) GetTypeInfo<TypeName>::VARIANT_TYPE);
+            set_field(isolate, context, obj, "left_type", (int) GetTypeInfo<TypeName>::VARIANT_TYPE);
+            set_field(isolate, context, obj, "right_type", (int) Variant::NIL);
             const uint32_t len = operators->Length();
             operators->Set(context, len, obj).Check();
         }
@@ -585,16 +586,16 @@ namespace jsb
     struct Comparator
     {
         template<typename TLeft, typename TRight>
-        static void Define(const v8::Local<v8::Context>& context, const v8::Local<v8::Array>& operators, const String& op_name)
+        static void Define(v8::Isolate* isolate, const v8::Local<v8::Context>& context, const v8::Local<v8::Array>& operators, const String& op_name)
         {
-            JSB_HANDLE_SCOPE(context->GetIsolate());
+            JSB_HANDLE_SCOPE(isolate);
 
-            v8::Local<v8::Object> obj = v8::Object::New(context->GetIsolate());
+            v8::Local<v8::Object> obj = v8::Object::New(isolate);
 
-            set_field(context->GetIsolate(), context, obj, "name", op_name);
-            set_field(context->GetIsolate(), context, obj, "return_type", (int) GetTypeInfo<bool>::VARIANT_TYPE);
-            set_field(context->GetIsolate(), context, obj, "left_type", (int) GetTypeInfo<TLeft>::VARIANT_TYPE);
-            set_field(context->GetIsolate(), context, obj, "right_type", (int) GetTypeInfo<TRight>::VARIANT_TYPE);
+            set_field(isolate, context, obj, "name", op_name);
+            set_field(isolate, context, obj, "return_type", (int) GetTypeInfo<bool>::VARIANT_TYPE);
+            set_field(isolate, context, obj, "left_type", (int) GetTypeInfo<TLeft>::VARIANT_TYPE);
+            set_field(isolate, context, obj, "right_type", (int) GetTypeInfo<TRight>::VARIANT_TYPE);
             const uint32_t len = operators->Length();
             operators->Set(context, len, obj).Check();
         }
@@ -603,7 +604,7 @@ namespace jsb
     template<typename TypeName>
     struct OperatorRegister
     {
-        static void generate(const v8::Local<v8::Context>& context, const v8::Local<v8::Array>& operators) {}
+        static void generate(v8::Isolate* isolate, const v8::Local<v8::Context>& context, const v8::Local<v8::Array>& operators) { jsb_unused(isolate); }
     };
 
     #define Number double
@@ -710,7 +711,7 @@ namespace jsb
 
             v8::Local<v8::Array> operators_obj = v8::Array::New(isolate);
             set_field(isolate, context, class_info_obj, "operators", operators_obj);
-            OperatorRegister<T>::generate(context, operators_obj);
+            OperatorRegister<T>::generate(isolate, context, operators_obj);
         }
 
         // enums

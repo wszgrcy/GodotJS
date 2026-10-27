@@ -10,7 +10,7 @@ namespace jsb
     class Essentials
     {
     public:
-        static void register_(const v8::Local<v8::Context>& context, const v8::Local<v8::Object>& self);
+        static void register_(v8::Isolate* isolate, const v8::Local<v8::Context>& context, const v8::Local<v8::Object>& self);
     };
 }
 

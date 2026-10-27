@@ -351,7 +351,7 @@ namespace jsb
         jsb_check(info.Data()->IsExternal());
         v8::Isolate* isolate = info.GetIsolate();
         v8::Local<v8::Context> context = isolate->GetCurrentContext();
-        const MethodBind* method_bind = (MethodBind*) info.Data().As<v8::External>()->Value();
+        const MethodBind* method_bind = (MethodBind*) info.Data().As<v8::External>()->Value(v8::kExternalPointerTypeTagDefault);
         const int argc = info.Length();
 
         jsb_check(method_bind);

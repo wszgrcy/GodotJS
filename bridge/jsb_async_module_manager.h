@@ -44,7 +44,7 @@ namespace jsb
         bool is_valid(AsyncModuleToken p_token) const;
 
         /** call by IAsyncModuleLoader */
-        void _mark_as_handled(const v8::Local<v8::Context>& p_context, AsyncModuleToken p_token, bool p_is_fulfill, const v8::Local<v8::Value>& p_value);
+        void _mark_as_handled(v8::Isolate* isolate, const v8::Local<v8::Context>& p_context, AsyncModuleToken p_token, bool p_is_fulfill, const v8::Local<v8::Value>& p_value);
         
         /** exposed JS function */
         static void _set_async_module_loader(const v8::FunctionCallbackInfo<v8::Value>& info);

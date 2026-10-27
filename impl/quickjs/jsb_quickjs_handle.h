@@ -2,6 +2,7 @@
 #define GODOTJS_QUICKJS_HANDLE_H
 
 #include "jsb_quickjs_pch.h"
+#include "../shared/jsb_v8_pointer_tags.h"
 #include "jsb_quickjs_data.h"
 #include "jsb_quickjs_broker.h"
 #include "jsb_quickjs_ext.h"

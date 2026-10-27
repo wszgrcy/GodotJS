@@ -95,7 +95,7 @@ namespace jsb
         v8::Context::Scope context_scope(context);
 
         impl::TryCatch try_catch(isolate);
-        const v8::MaybeLocal<v8::Value> func_maybe = impl::Helper::compile_function(context, p_source, p_len, p_name);
+        const v8::MaybeLocal<v8::Value> func_maybe = impl::Helper::compile_function(isolate, context, p_source, p_len, p_name);
         if (try_catch.has_caught())
         {
             JSB_LOG(Error, "%s", BridgeHelper::get_exception(try_catch));

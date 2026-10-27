@@ -293,7 +293,7 @@ namespace jsb
         }
         jsb_force_inline static Environment* wrap(const v8::Local<v8::Context>& p_context)
         {
-            Environment* env = (Environment*) p_context->GetAlignedPointerFromEmbedderData(kContextEmbedderData);
+            Environment* env = (Environment*) p_context->GetAlignedPointerFromEmbedderData(kContextEmbedderData, v8::kEmbedderDataTypeTagDefault);
             // jsb_check(env && env->thread_id_ == Thread::get_caller_id());
             return env;
         }
@@ -470,8 +470,8 @@ namespace jsb
         // May change in the future.
         jsb_force_inline void bind_valuetype(Variant* p_pointer, const v8::Local<v8::Object>& p_object)
         {
-            p_object->SetAlignedPointerInInternalField(IF_Pointer, p_pointer);
-            impl::Helper::SetDeleter(p_pointer, p_object, _valuetype_deleter, this);
+            p_object->SetAlignedPointerInInternalField(IF_Pointer, p_pointer, v8::kEmbedderDataTypeTagDefault);
+            impl::Helper::SetDeleter(isolate_, p_pointer, p_object, _valuetype_deleter, this);
         }
 
         jsb_force_inline NativeObjectID try_get_object_id(void* p_pointer) const { return object_db_.try_get_object_id(p_pointer); }

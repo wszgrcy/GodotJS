@@ -82,10 +82,9 @@ namespace jsb
 #endif
     }
 
-    void AsyncModuleManager::_mark_as_handled(const v8::Local<v8::Context>& p_context, AsyncModuleToken p_token, bool p_is_fulfill, const v8::Local<v8::Value>& p_value)
+    void AsyncModuleManager::_mark_as_handled(v8::Isolate* isolate, const v8::Local<v8::Context>& p_context, AsyncModuleToken p_token, bool p_is_fulfill, const v8::Local<v8::Value>& p_value)
     {
 #if JSB_SUPPORT_ASYNC_MODULE_LOADER
-        v8::Isolate* isolate = p_context->GetIsolate();
         Environment* env = Environment::wrap(isolate);
 
         v8::Local<v8::Promise::Resolver> resolver;

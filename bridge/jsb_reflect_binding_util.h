@@ -65,7 +65,7 @@ namespace jsb
     {
         static void* from(const v8::FunctionCallbackInfo<v8::Value>& info)
         {
-            return VariantInternal::get_opaque_pointer((Variant*) info.This()->GetAlignedPointerFromInternalField(IF_Pointer));
+            return VariantInternal::get_opaque_pointer((Variant*) info.This()->GetAlignedPointerFromInternalField(IF_Pointer, v8::kEmbedderDataTypeTagDefault));
         }
     };
 
@@ -75,7 +75,7 @@ namespace jsb
     {\
         jsb_force_inline static void* from(const v8::FunctionCallbackInfo<v8::Value>& info)\
         {\
-            return VariantInternal::FuncName((Variant*) info.This()->GetAlignedPointerFromInternalField(IF_Pointer));\
+            return VariantInternal::FuncName((Variant*) info.This()->GetAlignedPointerFromInternalField(IF_Pointer, v8::kEmbedderDataTypeTagDefault));\
         }\
     };
 
@@ -133,7 +133,7 @@ namespace jsb
         template<bool IsInstanceCallT>
         static void call(const v8::FunctionCallbackInfo<v8::Value>& info)
         {
-            const Variant::PTRBuiltInMethod func = (const Variant::PTRBuiltInMethod) info.Data().As<v8::External>()->Value();
+            const Variant::PTRBuiltInMethod func = (const Variant::PTRBuiltInMethod) info.Data().As<v8::External>()->Value(v8::kExternalPointerTypeTagDefault);
             if constexpr (IsInstanceCallT) func(TVariantOpaquePointer<OwnerT>::from(info), nullptr, nullptr, 0);
             else func(nullptr, nullptr, nullptr, 0);
         }
@@ -155,7 +155,7 @@ namespace jsb
                 jsb_throw(isolate, "bad param at 0");
                 return;
             }
-            const Variant::PTRBuiltInMethod func = (const Variant::PTRBuiltInMethod) info.Data().As<v8::External>()->Value();
+            const Variant::PTRBuiltInMethod func = (const Variant::PTRBuiltInMethod) info.Data().As<v8::External>()->Value(v8::kExternalPointerTypeTagDefault);
             const void* args[] = { &loc_0 };
             if constexpr (IsInstanceCallT) func(TVariantOpaquePointer<OwnerT>::from(info), args, nullptr, 0);
             else func(nullptr, args, nullptr, 0);
@@ -172,7 +172,7 @@ namespace jsb
         static void call(const v8::FunctionCallbackInfo<v8::Value>& info)
         {
             v8::Isolate* isolate = info.GetIsolate();
-            const Variant::PTRBuiltInMethod func = (const Variant::PTRBuiltInMethod) info.Data().As<v8::External>()->Value();
+            const Variant::PTRBuiltInMethod func = (const Variant::PTRBuiltInMethod) info.Data().As<v8::External>()->Value(v8::kExternalPointerTypeTagDefault);
             GDTransitionNumber<real_t> value = 0;
             if constexpr (IsInstanceCallT) func(TVariantOpaquePointer<OwnerT>::from(info), nullptr, &value, 0);
             else func(nullptr, nullptr, &value, 0);
@@ -190,7 +190,7 @@ namespace jsb
         static void call(const v8::FunctionCallbackInfo<v8::Value>& info)
         {
             v8::Isolate* isolate = info.GetIsolate();
-            const Variant::PTRBuiltInMethod func = (const Variant::PTRBuiltInMethod) info.Data().As<v8::External>()->Value();
+            const Variant::PTRBuiltInMethod func = (const Variant::PTRBuiltInMethod) info.Data().As<v8::External>()->Value(v8::kExternalPointerTypeTagDefault);
             GDTransitionNumber<int32_t> value = 0;
             if constexpr (IsInstanceCallT) func(TVariantOpaquePointer<OwnerT>::from(info), nullptr, &value, 0);
             else func(nullptr, nullptr, &value, 0);
@@ -208,7 +208,7 @@ namespace jsb
         static void call(const v8::FunctionCallbackInfo<v8::Value>& info)
         {
             v8::Isolate* isolate = info.GetIsolate();
-            const Variant::PTRBuiltInMethod func = (const Variant::PTRBuiltInMethod) info.Data().As<v8::External>()->Value();
+            const Variant::PTRBuiltInMethod func = (const Variant::PTRBuiltInMethod) info.Data().As<v8::External>()->Value(v8::kExternalPointerTypeTagDefault);
             bool value = false;
             if constexpr (IsInstanceCallT) func(TVariantOpaquePointer<OwnerT>::from(info), nullptr, &value, 0);
             else func(nullptr, nullptr, &value, 0);
@@ -232,7 +232,7 @@ namespace jsb
                 jsb_throw(isolate, "bad param at 0");
                 return;
             }
-            const Variant::PTRBuiltInMethod func = (const Variant::PTRBuiltInMethod) info.Data().As<v8::External>()->Value();
+            const Variant::PTRBuiltInMethod func = (const Variant::PTRBuiltInMethod) info.Data().As<v8::External>()->Value(v8::kExternalPointerTypeTagDefault);
             const void* args[] = { &loc_0 };
             GDTransitionNumber<real_t> value = 0;
             if constexpr (IsInstanceCallT) func(TVariantOpaquePointer<OwnerT>::from(info), args, &value, 0);
@@ -259,7 +259,7 @@ namespace jsb
         static void _getter(const v8::FunctionCallbackInfo<v8::Value>& info)
         {
             v8::Isolate* isolate = info.GetIsolate();
-            const Variant::PTRGetter getter_func = (const Variant::PTRGetter) info.Data().As<v8::External>()->Value();
+            const Variant::PTRGetter getter_func = (const Variant::PTRGetter) info.Data().As<v8::External>()->Value(v8::kExternalPointerTypeTagDefault);
 
             GDTransitionNumber<real_t> value[] = { 0 };
             getter_func(TVariantOpaquePointer<OwnerT>::from(info), &value);
@@ -270,7 +270,7 @@ namespace jsb
         {
             v8::Isolate* isolate = info.GetIsolate();
             const v8::Local<v8::Context> context = isolate->GetCurrentContext();
-            const Variant::PTRSetter setter_func = (const Variant::PTRSetter) info.Data().As<v8::External>()->Value();
+            const Variant::PTRSetter setter_func = (const Variant::PTRSetter) info.Data().As<v8::External>()->Value(v8::kExternalPointerTypeTagDefault);
             GDTransitionNumber<real_t> value;
             if (!StaticBindingUtil<GDTransitionNumber<real_t>>::get(isolate, context, info[0], value))
             {
@@ -290,7 +290,7 @@ namespace jsb
         static void _getter(const v8::FunctionCallbackInfo<v8::Value>& info)
         {
             v8::Isolate* isolate = info.GetIsolate();
-            const Variant::PTRGetter getter_func = (const Variant::PTRGetter) info.Data().As<v8::External>()->Value();
+            const Variant::PTRGetter getter_func = (const Variant::PTRGetter) info.Data().As<v8::External>()->Value(v8::kExternalPointerTypeTagDefault);
 
             GDTransitionNumber<int32_t> value[] = { 0 };
             getter_func(TVariantOpaquePointer<OwnerT>::from(info), &value);
@@ -305,7 +305,7 @@ namespace jsb
                 jsb_throw(info.GetIsolate(), "bad param");
                 return;
             }
-            const Variant::PTRSetter setter_func = (const Variant::PTRSetter) info.Data().As<v8::External>()->Value();
+            const Variant::PTRSetter setter_func = (const Variant::PTRSetter) info.Data().As<v8::External>()->Value(v8::kExternalPointerTypeTagDefault);
             setter_func(TVariantOpaquePointer<OwnerT>::from(info), &value);
         }
 

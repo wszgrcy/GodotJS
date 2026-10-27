@@ -20,6 +20,10 @@ namespace v8
         void SetAlignedPointerInInternalField(int slot, void* data);
         void SetAlignedPointerInInternalFields(int argc, int indices[], void* values[]);
         void* GetAlignedPointerFromInternalField(int slot) const;
+        // V8 15 hands a tag along with every embedder pointer. These engines do not
+        // tag anything, so the tagged overloads forward to the plain ones.
+        void SetAlignedPointerInInternalField(int slot, void* data, EmbedderDataTypeTag tag) { SetAlignedPointerInInternalField(slot, data); jsb_unused(tag); }
+        void* GetAlignedPointerFromInternalField(int slot, EmbedderDataTypeTag tag) const { return GetAlignedPointerFromInternalField(slot); }
 
         Local<String> GetConstructorName();
         

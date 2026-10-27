@@ -126,7 +126,7 @@ namespace jsb
 
             if (is_variant(object))
             {
-                const Variant* variant = (Variant*) object->GetAlignedPointerFromInternalField(IF_Pointer);
+                const Variant* variant = (Variant*) object->GetAlignedPointerFromInternalField(IF_Pointer, v8::kEmbedderDataTypeTagDefault);
                 return jsb_format("variant (%s)", Variant::get_type_name(variant->get_type()));
             }
 
@@ -198,7 +198,7 @@ namespace jsb
                     break;
                 }
 
-                void* pointer = self->GetAlignedPointerFromInternalField(IF_Pointer);
+                void* pointer = self->GetAlignedPointerFromInternalField(IF_Pointer, v8::kEmbedderDataTypeTagDefault);
                 r_cvar = Environment::wrap(isolate)->verify_object(pointer) ? (Object*) pointer : nullptr;
                 return true;
             }
@@ -290,7 +290,7 @@ namespace jsb
                     break;
                 }
 
-                void* pointer = self->GetAlignedPointerFromInternalField(IF_Pointer);
+                void* pointer = self->GetAlignedPointerFromInternalField(IF_Pointer, v8::kEmbedderDataTypeTagDefault);
                 r_cvar = *(Variant*) pointer;
                 return true;
             }
@@ -393,7 +393,7 @@ namespace jsb
                 if (const NativeClassInfoPtr class_info = env->expose_godot_primitive_class(p_type, &class_id))
                 {
                     jsb_check(class_id && class_info->type == NativeClassType::GodotPrimitive);
-                    r_jval = class_info->clazz.NewInstance(context);
+                    r_jval = class_info->clazz.NewInstance(isolate, context);
                     const v8::Local<v8::Object> instance = r_jval.As<v8::Object>();
                     jsb_check(TypeConvert::is_variant(instance));
                     env->bind_valuetype(env->alloc_variant(p_cvar), instance);
@@ -452,7 +452,7 @@ namespace jsb
         {
             // class_info ptr will be invalid after escape()
             // to avoid possible side effects during `NewInstance`
-            r_jval = class_info.escape()->clazz.NewInstance(context);
+            r_jval = class_info.escape()->clazz.NewInstance(isolate, context);
             jsb_check(TypeConvert::is_object(r_jval));
 
             // the lifecycle will be managed by javascript runtime, DO NOT DELETE it externally
@@ -534,14 +534,14 @@ namespace jsb
 
             switch (self->InternalFieldCount())
             {
-            case IF_VariantFieldCount: { r_cvar = *(Variant*) self->GetAlignedPointerFromInternalField(IF_Pointer); return true; }
+            case IF_VariantFieldCount: { r_cvar = *(Variant*) self->GetAlignedPointerFromInternalField(IF_Pointer, v8::kEmbedderDataTypeTagDefault); return true; }
             case IF_ObjectFieldCount:
                 {
-                    if ((NativeClassType::Type)(uintptr_t) self->GetAlignedPointerFromInternalField(IF_ClassType) != NativeClassType::GodotObject)
+                    if ((NativeClassType::Type)(uintptr_t) self->GetAlignedPointerFromInternalField(IF_ClassType, v8::kEmbedderDataTypeTagDefault) != NativeClassType::GodotObject)
                     {
                         return false;
                     }
-                    void* pointer = self->GetAlignedPointerFromInternalField(IF_Pointer);
+                    void* pointer = self->GetAlignedPointerFromInternalField(IF_Pointer, v8::kEmbedderDataTypeTagDefault);
                     r_cvar = Environment::wrap(isolate)->verify_object(pointer) ? (Object*) pointer : nullptr;
                     return true;
                 }
@@ -645,7 +645,7 @@ namespace jsb
                 {
                     return false;
                 }
-                const Variant* target = (const Variant*) self->GetAlignedPointerFromInternalField(IF_Pointer);
+                const Variant* target = (const Variant*) self->GetAlignedPointerFromInternalField(IF_Pointer, v8::kEmbedderDataTypeTagDefault);
                 if (!target)
                 {
                     return Variant::can_convert_strict(Variant::NIL, p_type);
@@ -682,13 +682,13 @@ namespace jsb
         // return false if strict type check fails
         const v8::Local<v8::Object> self = p_jval.As<v8::Object>();
         if (!TypeConvert::is_object(self)
-            || (NativeClassType::Type)(uintptr_t) self->GetAlignedPointerFromInternalField(IF_ClassType) != NativeClassType::GodotObject)
+            || (NativeClassType::Type)(uintptr_t) self->GetAlignedPointerFromInternalField(IF_ClassType, v8::kEmbedderDataTypeTagDefault) != NativeClassType::GodotObject)
         {
             return false;
         }
 
         // dead objects return true with a nullptr
-        void* pointer = self->GetAlignedPointerFromInternalField(IF_Pointer);
+        void* pointer = self->GetAlignedPointerFromInternalField(IF_Pointer, v8::kEmbedderDataTypeTagDefault);
         r_godot_obj = Environment::wrap(isolate)->verify_object(pointer) ? (Object*) pointer : nullptr;
         return true;
     }

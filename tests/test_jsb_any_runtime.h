@@ -157,6 +157,11 @@ namespace jsb::tests
         v8::Isolate* isolate = v8::Isolate::New(create_params);
         v8::Global<v8::Context> context_v;
         {
+            // V8 15 refuses to work with an isolate that is not entered: without
+            // this scope v8::Context::New crashes. V8 12 accepted it, which is why
+            // the scopes below are commented out (entering the same isolate twice
+            // in a row is not allowed, so there is exactly one here).
+            v8::Isolate::Scope isolate_scope(isolate);
             {
                 // v8::Isolate::Scope isolate_scope(isolate);
                 v8::HandleScope scope_0(isolate);
@@ -222,7 +227,7 @@ namespace jsb::tests
                 builder1.Instance().Method("Method", StubBindings::method);
                 class1 = builder1.Build();
                 context->Global()->Set(context, impl::Helper::new_string(isolate, "B1"), class1.Get(isolate)).Check();
-                Essentials::register_(context, context->Global());
+                Essentials::register_(isolate, context, context->Global());
             // }
             // {
             //     v8::HandleScope scope_1(isolate);
@@ -265,7 +270,7 @@ check_class(S2, S3);
 return 1+1;
 }))--";
                 impl::TryCatch try_catch(isolate);
-                v8::MaybeLocal<v8::Value> eval = impl::Helper::compile_function(context, source, ::std::size(source) - 1, "testcase.js");
+                v8::MaybeLocal<v8::Value> eval = impl::Helper::compile_function(isolate, context, source, ::std::size(source) - 1, "testcase.js");
                 Utils::print_exception(try_catch);
                 CHECK(!eval.IsEmpty());
                 CHECK(eval.ToLocalChecked()->IsFunction());
@@ -315,7 +320,7 @@ return 1+1;
                 v8::HandleScope scope_1(isolate);
                 // const v8::Context::Scope context_scope(context);
 
-                Essentials::register_(context, context->Global());
+                Essentials::register_(isolate, context, context->Global());
 
                 auto exposed = env->expose_godot_object_class(ClassDB::classes.getptr("Object"));
 

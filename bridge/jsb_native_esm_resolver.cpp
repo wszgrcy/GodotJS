@@ -315,7 +315,7 @@ namespace jsb
             const impl::TryCatch try_catch_run(isolate);
             {
                 v8::HandleScope parse_scope(isolate);
-                ScriptClassInfo::_parse_script_class(context, *module);
+                ScriptClassInfo::_parse_script_class(isolate, context, *module);
             }
             if (try_catch_run.has_caught())
             {
@@ -332,8 +332,9 @@ namespace jsb
         v8::Local<v8::FixedArray> /*p_import_attributes*/,
         v8::Local<v8::Module> p_referrer)
     {
-        v8::Isolate* isolate = p_context->GetIsolate();
+        // V8 15 不再让 Context 反查 isolate，而这里的 isolate 本来就能从 Environment 拿到
         Environment* env = Environment::wrap(p_context);
+        v8::Isolate* isolate = env->get_isolate();
         const String specifier = impl::Helper::to_string(isolate, p_specifier);
         const String parent_id = env->find_esm_module_id_by_script_id(p_referrer->ScriptId());
 
@@ -425,8 +426,9 @@ namespace jsb
         v8::Local<v8::String> p_specifier,
         v8::Local<v8::FixedArray> /*p_import_attributes*/)
     {
-        v8::Isolate* isolate = p_context->GetIsolate();
+        // V8 15 不再让 Context 反查 isolate，而这里的 isolate 本来就能从 Environment 拿到
         Environment* env = Environment::wrap(p_context);
+        v8::Isolate* isolate = env->get_isolate();
         const String specifier = impl::Helper::to_string(isolate, p_specifier);
 
         // 发起方的 ScriptOrigin 里存的就是它的资源路径，相对路径按它算
@@ -470,8 +472,9 @@ namespace jsb
         v8::Local<v8::Module> p_module,
         v8::Local<v8::Object> p_meta)
     {
-        v8::Isolate* isolate = p_context->GetIsolate();
+        // V8 15 不再让 Context 反查 isolate，而这里的 isolate 本来就能从 Environment 拿到
         Environment* env = Environment::wrap(p_context);
+        v8::Isolate* isolate = env->get_isolate();
         const StringName module_id = env->find_esm_module_id_by_script_id(p_module->ScriptId());
         if (module_id == StringName())
         {

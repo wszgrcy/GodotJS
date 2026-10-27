@@ -2,6 +2,7 @@
 #define GODOTJS_WEB_HANDLE_H
 
 #include "jsb_web_pch.h"
+#include "../shared/jsb_v8_pointer_tags.h"
 #include "jsb_web_data.h"
 #include "jsb_web_broker.h"
 #include "jsb_web_ext.h"

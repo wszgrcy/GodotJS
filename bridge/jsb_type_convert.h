@@ -59,7 +59,7 @@ namespace jsb
         jsb_force_inline static bool is_object(const v8::Local<v8::Object>& p_obj, NativeClassType::Type p_type)
         {
             if (!is_object(p_obj)) return false;
-            return (NativeClassType::Type)(uintptr_t) p_obj->GetAlignedPointerFromInternalField(IF_ClassType) == p_type;
+            return (NativeClassType::Type)(uintptr_t) p_obj->GetAlignedPointerFromInternalField(IF_ClassType, v8::kEmbedderDataTypeTagDefault) == p_type;
         }
 
     };

@@ -15,13 +15,13 @@ namespace jsb
 
             if (TypeConvert::is_variant(self))
             {
-                const Variant* variant = (Variant*) self->GetAlignedPointerFromInternalField(IF_Pointer);
+                const Variant* variant = (Variant*) self->GetAlignedPointerFromInternalField(IF_Pointer, v8::kEmbedderDataTypeTagDefault);
                 const String type_name = Variant::get_type_name(variant->get_type());
                 return jsb_format("[%s %s]", type_name, variant->operator String());
             }
             if (TypeConvert::is_object(self))
             {
-                void* pointer = self->GetAlignedPointerFromInternalField(IF_Pointer);
+                void* pointer = self->GetAlignedPointerFromInternalField(IF_Pointer, v8::kEmbedderDataTypeTagDefault);
                 const NativeClassInfo* class_info = environment->find_object_class(pointer);
                 if (jsb_unlikely(!class_info))
                 {

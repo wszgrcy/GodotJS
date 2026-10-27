@@ -46,9 +46,9 @@ namespace jsb::impl
         }
 
         //NOTE NewInstance should not trigger the underlying native constructor of this class
-        jsb_force_inline v8::Local<v8::Object> NewInstance(const v8::Local<v8::Context> context) const
+        jsb_force_inline v8::Local<v8::Object> NewInstance(v8::Isolate* isolate, const v8::Local<v8::Context> context) const
         {
-            v8::Isolate* isolate = context->GetIsolate();
+            jsb_unused(context);
             return v8::Local<v8::Object>(v8::Data(isolate,isolate->push_copy(
                 _NewObject(isolate, (JSValueRef) prototype_, internal_field_count_))));
         }

@@ -244,7 +244,17 @@ namespace jsb
             }
 
             const v8::Local<v8::Promise> promise = message.GetPromise();
+#if JSB_WITH_V8
+            // V8 15.x no longer exposes the isolate through a promise, and the callback signature
+            // is fixed by V8, so read the isolate that V8 has currently entered.
+            v8::Isolate* isolate = v8::Isolate::GetCurrent();
+#else
+            // The engines that emulate the V8 API still hand out their isolate through
+            // the object, so use it directly there.
             v8::Isolate* isolate = promise->GetIsolate();
+#endif
+            jsb_check(isolate != nullptr);
+            jsb_unused(promise);
 
             const String str = impl::Helper::to_string_without_side_effect(isolate, message.GetValue());
             JSB_LOG(Error, "unhandled promise rejection: %s", str);
@@ -304,7 +314,7 @@ namespace jsb
                 const v8::Context::Scope context_scope(context);
                 const v8::Local<v8::Object> global = context->Global();
 
-                context->SetAlignedPointerInEmbedderData(kContextEmbedderData, this);
+                context->SetAlignedPointerInEmbedderData(kContextEmbedderData, this, v8::kEmbedderDataTypeTagDefault);
                 context_.Reset(isolate_, context);
 
                 // init module cache, and register the global 'require' function
@@ -387,7 +397,7 @@ namespace jsb
                 }
 
                 Worker::register_(context, global);
-                Essentials::register_(context, global);
+                Essentials::register_(isolate_, context, global);
                 register_primitive_bindings(this);
             }
 
@@ -501,7 +511,7 @@ namespace jsb
             debugger_.on_context_destroyed(context);
             debugger_.drop();
 #endif
-            context->SetAlignedPointerInEmbedderData(kContextEmbedderData, nullptr);
+            context->SetAlignedPointerInEmbedderData(kContextEmbedderData, nullptr, v8::kEmbedderDataTypeTagDefault);
 
 #if JSB_NATIVE_ESM && JSB_WITH_V8
             // script id 是按 isolate 分配的，context 重建后旧的映射就认不出模块了，不能留着
@@ -920,9 +930,9 @@ namespace jsb
         jsb_check(p_object->InternalFieldCount() == IF_ObjectFieldCount);
         jsb_check((uintptr_t) p_type % 2 == 0); // fake 2-byte alignment
 
-        static int indices[]    = { IF_Pointer, IF_ClassType };
-        void* internal_fields[] = { p_pointer,  (void*)(uintptr_t) p_type };
-        p_object->SetAlignedPointerInInternalFields(IF_ObjectFieldCount, indices, internal_fields);
+        // V8 15.x dropped the bulk setter, so each field is written on its own
+        p_object->SetAlignedPointerInInternalField(IF_Pointer, p_pointer, v8::kEmbedderDataTypeTagDefault);
+        p_object->SetAlignedPointerInInternalField(IF_ClassType, (void*)(uintptr_t) p_type, v8::kEmbedderDataTypeTagDefault);
 
         handle->class_id = p_class_id;
         handle->js_owned_non_ref_ = p_js_owned_non_ref;
@@ -964,7 +974,7 @@ namespace jsb
         {
             return nullptr;
         }
-        void* pointer = p_obj->GetAlignedPointerFromInternalField(IF_Pointer);
+        void* pointer = p_obj->GetAlignedPointerFromInternalField(IF_Pointer, v8::kEmbedderDataTypeTagDefault);
         return verify_object(pointer) ? pointer : nullptr;
     }
 
@@ -1308,7 +1318,7 @@ namespace jsb
                     {
                         const impl::TryCatch try_catch_run(isolate);
                         v8::HandleScope parse_scope(isolate);
-                        ScriptClassInfo::_parse_script_class(context, *resolved_module);
+                        ScriptClassInfo::_parse_script_class(isolate, context, *resolved_module);
                         if (try_catch_run.has_caught())
                         {
                             JSB_LOG(Error, "something wrong when parsing '%s'\n%s", module_id, BridgeHelper::get_exception(try_catch_run));
@@ -1345,7 +1355,7 @@ namespace jsb
                     const impl::TryCatch try_catch_run(isolate);
                     {
                         v8::HandleScope parse_scope(isolate);
-                        ScriptClassInfo::_parse_script_class(context, module);
+                        ScriptClassInfo::_parse_script_class(isolate, context, module);
                     }
                     if (try_catch_run.has_caught())
                     {
@@ -1442,7 +1452,7 @@ namespace jsb
         v8::Local<v8::Value> class_prototype = class_obj->Get(context, jsb_name(this, prototype)).ToLocalChecked();
         v8::Local<v8::Function> new_target = impl::Helper::new_noop_constructor(isolate_, context);
         new_target->Set(context, jsb_name(this, prototype), class_prototype).Check();
-        new_target->Set(context, jsb_symbol(this, ConstructorBindObject), v8::External::New(isolate, p_this)).Check();
+        new_target->Set(context, jsb_symbol(this, ConstructorBindObject), v8::External::New(isolate, p_this, v8::kExternalPointerTypeTagDefault)).Check();
 
         v8::Local<v8::Object> reflect = context->Global()->Get(context, jsb_name(this, Reflect)).ToLocalChecked().As<v8::Object>();
         v8::Local<v8::Function> reflect_construct = reflect->Get(context, jsb_name(this, construct)).ToLocalChecked().As<v8::Function>();
@@ -1707,7 +1717,7 @@ namespace jsb
         v8::Context::Scope context_scope(context);
 
         const impl::TryCatch try_catch_run(isolate_);
-        const v8::MaybeLocal<v8::Value> maybe = impl::Helper::eval(context, p_source, p_length, p_filename);
+        const v8::MaybeLocal<v8::Value> maybe = impl::Helper::eval(isolate_, context, p_source, p_length, p_filename);
         if (try_catch_run.has_caught())
         {
             r_err = ERR_COMPILATION_FAILED;
