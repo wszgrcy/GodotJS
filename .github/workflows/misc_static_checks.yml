@@ -1,0 +1,83 @@
+name: 🧹 Static Checks
+
+# Cheap checks on the files that decide how the rest of the pipeline behaves.
+# A broken workflow file or config.py is only noticed when a build starts,
+# so catch it here instead.
+
+on:
+  workflow_call:
+
+permissions:
+  contents: read
+
+jobs:
+  checks:
+    name: 🔍 CI config and scripts
+    runs-on: ubuntu-latest
+    steps:
+      - name: 📥 Checkout GodotJS
+        uses: actions/checkout@v6
+
+      - name: 🐍 Setup Python
+        uses: actions/setup-python@v6
+        with:
+          python-version: "3.12"
+
+      - name: 📦 Install PyYAML
+        run: python -m pip install --quiet pyyaml
+
+      - name: 🔍 Workflow files are valid YAML
+        run: |
+          python - <<'PY'
+          import glob, sys, yaml
+
+          failed = False
+          for path in sorted(glob.glob(".github/workflows/*.yml")):
+              try:
+                  data = yaml.safe_load(open(path))
+              except Exception as exc:
+                  print(f"::error file={path}::not valid YAML: {exc}")
+                  failed = True
+                  continue
+              if not isinstance(data, dict) or "jobs" not in data:
+                  print(f"::error file={path}::parsed but has no jobs section")
+                  failed = True
+              else:
+                  print(f"ok  {path} ({len(data['jobs'])} jobs)")
+          sys.exit(1 if failed else 0)
+          PY
+
+      - name: 🔍 JSON config files parse
+        run: |
+          python - <<'PY'
+          import json, subprocess, sys
+
+          # tsconfig files are JSONC (comments and trailing commas are allowed),
+          # so they are checked by the TypeScript build instead of here.
+          files = [
+              f
+              for f in subprocess.run(
+                  ["git", "ls-files", "*.json"], capture_output=True, text=True
+              ).stdout.split()
+              if "tsconfig" not in f
+          ]
+          failed = False
+          for path in files:
+              try:
+                  json.load(open(path))
+              except Exception as exc:
+                  print(f"::error file={path}::not valid JSON: {exc}")
+                  failed = True
+              else:
+                  print(f"ok  {path}")
+          sys.exit(1 if failed else 0)
+          PY
+
+      - name: 🐍 Python scripts compile
+        run: |
+          set -e
+          files=$(git ls-files '*.py')
+          echo "$files"
+          # config.py decides whether SCons can even read the module, so a syntax
+          # error here breaks every platform build.
+          python -m py_compile $files

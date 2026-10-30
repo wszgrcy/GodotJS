@@ -29,6 +29,11 @@ jobs:
     name: 🔄 Changesets
     uses: ./.github/workflows/misc_changesets.yml
 
+  static-checks:
+    name: 🧹 Static Checks
+    # Runs on its own: a failure here is reported but does not stop the builds.
+    uses: ./.github/workflows/misc_static_checks.yml
+
   engine-version-build:
     name: ⚙️ Build Godot Version with GodotJS
     needs: [environment, changesets]

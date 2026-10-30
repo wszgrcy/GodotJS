@@ -118,6 +118,19 @@ jobs:
           fi
         continue-on-error: true
 
+      # ANGLE gives the Compatibility renderer a GLES-over-Metal path. Without it
+      # Godot silently sets angle=no (platform/macos/detect.py), so we install it
+      # the same way upstream Godot does and only fall back with a warning.
+      - name: Download pre-built ANGLE
+        id: angle-sdk
+        run: |
+          if python ./misc/scripts/install_angle.py; then
+            echo "ANGLE_ENABLED=yes" >> "$GITHUB_OUTPUT"
+          else
+            echo "::warning::macOS: ANGLE installation failed, building without ANGLE support."
+            echo "ANGLE_ENABLED=no" >> "$GITHUB_OUTPUT"
+          fi
+
       - name: Download scripts/out
         uses: actions/download-artifact@v8
         with:
@@ -134,6 +147,7 @@ jobs:
             ${{ matrix.engine == 'jsc' && 'use_jsc=yes' || '' }}
             arch=x86_64
             vulkan=${{ steps.vulkan-sdk.outputs.VULKAN_ENABLED }}
+            angle=${{ steps.angle-sdk.outputs.ANGLE_ENABLED }}
             ${{ !inputs.release && matrix.target == 'editor' && 'tests=yes' || '' }}
           platform: macos
           target: ${{ matrix.target }}
@@ -148,6 +162,7 @@ jobs:
             ${{ matrix.engine == 'jsc' && 'use_jsc=yes' || '' }}
             arch=arm64
             vulkan=${{ steps.vulkan-sdk.outputs.VULKAN_ENABLED }}
+            angle=${{ steps.angle-sdk.outputs.ANGLE_ENABLED }}
             ${{ !inputs.release && matrix.target == 'editor' && 'tests=yes' || '' }}
           platform: macos
           target: ${{ matrix.target }}

@@ -206,6 +206,7 @@ jobs:
           $code = $LASTEXITCODE
           $output | Write-Output
           if ($code -ne 0) { Write-Error "单元测试失败，退出码 $code"; exit 1 }
-          # 输出里没有 doctest 的汇总就说明测试根本没跑起来，别让这一步假绿。
+          # Without a doctest summary in the output the tests never ran; don't let
+          # this step report success in that case.
           if (-not ($output -match "\[doctest\]")) { Write-Error "测试没有运行：输出里找不到 doctest 汇总"; exit 1 }
 
