@@ -141,7 +141,7 @@ jobs:
         with:
           scons-flags: >-
             ${{ env.SCONS_FLAGS }}
-            ${{ matrix.target == 'editor' && 'vsproj=yes vsproj_gen_only=no windows_subsystem=console' || '' }}
+            ${{ matrix.target == 'editor' && 'vsproj=yes vsproj_gen_only=no' || '' }}
             ${{ matrix.engine == 'qjs-ng' && 'use_quickjs_ng=yes' || '' }}
             ${{ !inputs.release && matrix.target == 'editor' && 'tests=yes' || '' }}
           platform: windows
@@ -160,6 +160,10 @@ jobs:
           # They are build inputs and are not needed at runtime, so drop them -
           # upstream Godot does the same before uploading its artifacts.
           Remove-Item bin/build_deps -Recurse -Force -ErrorAction SilentlyContinue
+          # The Agility SDK DLLs are an optional override: when they are missing the
+          # engine falls back to the D3D12 runtime that ships with Windows, which is
+          # what official Godot packages do. Match that and save 9 MB.
+          Remove-Item bin/D3D12Core.dll,bin/d3d12SDKLayers.dll -Force -ErrorAction SilentlyContinue
 
       - name: Setup pnpm
         if: ${{ !inputs.release && matrix.target == 'editor' }}
@@ -188,9 +192,20 @@ jobs:
 
       - name: Unit tests
         if: ${{ !inputs.release && matrix.target == 'editor' }}
+        shell: pwsh
         env:
-          BIN: ./bin/godot.windows.editor.x86_64.exe
+          # The editor is a GUI-subsystem program now, and a shell does not always
+          # wait for one. The console wrapper is a console program: it forwards the
+          # arguments, waits for the editor to exit and returns its exit code.
+          BIN: ./bin/godot.windows.editor.x86_64_console.exe
         run: |
+          if (-not (Test-Path "${{ env.BIN }}")) { Write-Error "没有生成 console 包装器：${{ env.BIN }}"; exit 1 }
           ${{ env.BIN }} --version
           ${{ env.BIN }} --help
-          ${{ env.BIN }} --headless --test --test-case="[jsb]*" --force-colors
+          $output = & "${{ env.BIN }}" --headless --test --test-case="[jsb]*" --force-colors 2>&1
+          $code = $LASTEXITCODE
+          $output | Write-Output
+          if ($code -ne 0) { Write-Error "单元测试失败，退出码 $code"; exit 1 }
+          # 输出里没有 doctest 的汇总就说明测试根本没跑起来，别让这一步假绿。
+          if (-not ($output -match "\[doctest\]")) { Write-Error "测试没有运行：输出里找不到 doctest 汇总"; exit 1 }
+
