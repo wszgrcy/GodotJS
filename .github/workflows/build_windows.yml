@@ -197,7 +197,8 @@ jobs:
           # The editor is a GUI-subsystem program now, and a shell does not always
           # wait for one. The console wrapper is a console program: it forwards the
           # arguments, waits for the editor to exit and returns its exit code.
-          BIN: ./bin/godot.windows.editor.x86_64_console.exe
+          # Its name comes from PROGSUFFIX_WRAP in SConstruct: ".console" with dots.
+          BIN: ./bin/godot.windows.editor.x86_64.console.exe
         run: |
           if (-not (Test-Path "${{ env.BIN }}")) { Write-Error "没有生成 console 包装器：${{ env.BIN }}"; exit 1 }
           ${{ env.BIN }} --version
