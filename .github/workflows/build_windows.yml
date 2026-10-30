@@ -156,6 +156,10 @@ jobs:
       - name: Prepare artifact
         run: |
           Remove-Item bin/* -Include *.exp,*.lib,*.pdb -Force
+          # The D3D12 SDK installer and the mesa libraries land in bin/build_deps.
+          # They are build inputs and are not needed at runtime, so drop them -
+          # upstream Godot does the same before uploading its artifacts.
+          Remove-Item bin/build_deps -Recurse -Force -ErrorAction SilentlyContinue
 
       - name: Setup pnpm
         if: ${{ !inputs.release && matrix.target == 'editor' }}
