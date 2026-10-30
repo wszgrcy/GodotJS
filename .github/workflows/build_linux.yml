@@ -254,6 +254,32 @@ jobs:
           platform: linuxbsd
           target: editor
 
+      # The [jsb] test cases need the test project compiled: the helpers check
+      # that .godot/GodotJS/test_01.js exists, and that file is produced by
+      # pnpm build from test_01.ts. Without these steps the tests run but fail.
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v6
+        with:
+          version: 10.11.0
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v5
+        with:
+          node-version: 24
+
+      - name: Build tests/project
+        shell: bash
+        env:
+          # Type generation starts the editor, and starting the editor pulls in
+          # SDL/dbus and fontconfig. Both leak; LeakSanitizer would otherwise
+          # fail this step over allocations we don't own. Leak checking stays on
+          # for the test run below, which is the thing actually under test.
+          ASAN_OPTIONS: detect_leaks=0
+        run: |
+          set -euo pipefail
+          pnpm -C "${{ github.workspace }}/modules/GodotJS/tests/project" install --ignore-workspace
+          GODOT="${{ github.workspace }}/bin/godot.linuxbsd.editor.dev.x86_64.san" pnpm -C "${{ github.workspace }}/modules/GodotJS/tests/project" build
+
       - name: Unit tests
         shell: bash
         env:
