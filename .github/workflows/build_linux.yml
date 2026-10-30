@@ -181,3 +181,106 @@ jobs:
           ${{ env.BIN }} --version
           ${{ env.BIN }} --help
           ${{ env.BIN }} --headless --test --test-case="[jsb]*" --force-colors
+
+  # Editor built with AddressSanitizer. It uploads no artifact, it only runs the
+  # JS tests with the sanitizer on. The flags below were measured on a local
+  # build of this tree:
+  #
+  # - dev_build=yes is required. Without it the editor is compiled at -O2 and
+  #   tests/scene/test_text_edit.cpp alone takes more than 18 minutes.
+  # - mold is required. The default bfd linker cannot link this binary (it fails
+  #   with a relocation overflow), and upstream Godot also switches the linker
+  #   for its sanitizer builds.
+  # - use_ubsan=yes is left out on purpose. With it the link fails with
+  #   "relocation R_X86_64_PC32 against __ubsan_vptr_type_cache out of range",
+  #   because this build compiles tests/, which upstream sanitizer builds don't.
+  # - accesskit is off: it needs a downloaded SDK and has nothing to do with the
+  #   JS runtime under test.
+  build-linux-asan:
+    name: Linux (ASan, v8)
+    runs-on: ubuntu-22.04
+    timeout-minutes: 120
+    steps:
+      - name: Checkout Godot
+        uses: actions/checkout@v6
+        with:
+          repository: godotengine/godot
+          ref: ${{ inputs.version_ref }}
+          submodules: recursive
+
+      - name: Checkout GodotJS
+        uses: actions/checkout@v6
+        with:
+          path: ${{github.workspace}}/modules/GodotJS/
+          lfs: true
+          submodules: recursive
+
+      - name: Setup Godot dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install libwayland-bin mesa-vulkan-drivers
+
+      - name: Free disk space on runner
+        run: |
+          echo "Disk usage before:" && df -h
+          sudo rm -rf /usr/local/lib/android
+          echo "Disk usage after:" && df -h
+
+      - name: Install mold linker
+        uses: rui314/setup-mold@v1
+        with:
+          make-default: false
+
+      - name: Download scripts/out
+        uses: actions/download-artifact@v8
+        with:
+          name: scripts-out
+          path: ${{github.workspace}}/modules/GodotJS/scripts/out
+
+      - name: Setup Python and SCons
+        uses: ./.github/actions/godot-deps
+
+      - name: Compilation
+        uses: ./.github/actions/godot-build
+        with:
+          scons-flags: >-
+            ${{ env.SCONS_FLAGS }}
+            accesskit=no
+            tests=yes
+            dev_build=yes
+            use_asan=yes
+            linker=mold
+            debug_symbols=no
+          platform: linuxbsd
+          target: editor
+
+      - name: Unit tests
+        shell: bash
+        env:
+          BIN: ./bin/godot.linuxbsd.editor.dev.x86_64.san
+          ASAN_OPTIONS: color=always:print_suppressions=1:suppressions=${{ github.workspace }}/misc/error_suppressions/asan.txt
+        run: |
+          if [ ! -x "${{ env.BIN }}" ]; then
+            echo "ASan 构建产物不存在：${{ env.BIN }}"
+            exit 1
+          fi
+          set +e
+          output=$("${{ env.BIN }}" --headless --test --test-case="[jsb]*" --force-colors 2>&1)
+          code=$?
+          set -e
+          printf '%s\n' "$output"
+          if [ "$code" -ne 0 ]; then
+            echo "ASan 下单元测试失败，退出码 $code"
+            exit 1
+          fi
+          # Without a doctest summary the tests never ran; don't report success.
+          if ! printf '%s\n' "$output" | grep -q '\[doctest\]'; then
+            echo "测试没有运行：输出里找不到 doctest 汇总"
+            exit 1
+          fi
+          # "failed to intercept" lines mention AddressSanitizer too, so only the
+          # real report headers count as a failure.
+          if printf '%s\n' "$output" | grep -qE 'ERROR: (AddressSanitizer|LeakSanitizer)'; then
+            echo "ASan 报告了内存问题，见上面的日志"
+            exit 1
+          fi
