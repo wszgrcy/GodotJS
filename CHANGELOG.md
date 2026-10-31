@@ -1,5 +1,27 @@
 # @godot-js/editor
 
+## 1.3.2
+
+### Patch Changes
+
+-   让实例上的 `name` 属性真正读写引擎节点名。
+
+    此前 `name` 被整体排除在属性绑定之外，`node.name = "X"` 只会改到 JS 包装对象上，
+    引擎名不变且不报错，靠名字解析的东西（`get_node("X")`、动画轨道路径）会静默失效。
+
+    需要三处配合修改：
+
+    -   `internal/jsb_string_names.cpp`：去掉对 `name` 的整体排除。
+    -   `bridge/jsb_object_bindings.cpp`：给 `name` 豁免 getter/setter 方法省略，
+        否则绑上属性就会丢掉 `get_name()` / `set_name()`。
+    -   `bridge/jsb_editor_utility_funcs.cpp`：typings 导出做同样豁免，
+        否则运行时方法还在但 typings 说没有，`tsc` 编不过。
+
+    改完 `.name` 与 `get_name()` / `set_name()` 两边都可用，与 GDScript 一致；
+    JS 类与函数自带的 `name` 不受影响（Godot 属性装在原型上，与构造器不同对象）。
+
+    新增 `tests/project/tests/naming/` 覆盖上述行为。
+
 ## 1.3.0
 
 ### Minor Changes
@@ -486,18 +508,19 @@
 -   e28d324: **Feature:** Added settings to optionally generate `.d.ts` files for Godot scene files in the Editor.
 -   8998cef: `--generate-types` now follows the engine locale for doc comments
 
-    `DocData` always holds the raw English text from `doc/classes/*.xml`; the editor only
-    translates on display, through `DTR()`. The type generator read the raw text, so generated
-    `.d.ts` files came out English whatever locale was passed.
+        `DocData` always holds the raw English text from `doc/classes/*.xml`; the editor only
+        translates on display, through `DTR()`. The type generator read the raw text, so generated
+        `.d.ts` files came out English whatever locale was passed.
 
-    Wrapping the doc text fields in `DTR()` makes `godot --headless --editor --generate-types
--l zh_Hans` emit the official Simplified Chinese class reference, i.e. the same strings the
+        Wrapping the doc text fields in `DTR()` makes `godot --headless --editor --generate-types
+
+    -l zh_Hans` emit the official Simplified Chinese class reference, i.e. the same strings the
     editor Help panel shows. This works for the locales the engine ships doc translations for
     (`zh_Hans`, `zh_Hant`, `fr`, `es`, `ru`, `ko`, ...). The locale has to match the doc catalog
     exactly: `zh_CN` is not one of them and silently falls back to English.
 
-    With the default locale the text stays English, since `DTR()` returns the source string when
-    no doc translation is loaded.
+        With the default locale the text stays English, since `DTR()` returns the source string when
+        no doc translation is loaded.
 
 -   e28d324: fix: exported properties no longer leak into the base class.
     feat: inherited properties now class categorized in the Editor.

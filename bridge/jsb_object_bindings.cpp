@@ -70,8 +70,14 @@ namespace jsb
                         getset_info._setptr ? _godot_object_method : nullptr, (void*) getset_info._setptr);
 
 #if JSB_EXCLUDE_GETSET_METHODS
-                    if (internal::VariantUtil::is_valid_name(getset_info.getter)) omitted_methods.insert(getset_info.getter);
-                    if (internal::VariantUtil::is_valid_name(getset_info.setter)) omitted_methods.insert(getset_info.setter);
+                    // `name` 例外：`get_name()` / `set_name()` 是 Godot 里最常用的写法，
+                    // 绑上属性也不能把这两个方法摘掉 —— GDScript 那边属性和方法本来就同时可用，
+                    // 这里保持一致，否则存量代码会整片 `set_name is not a function`。
+                    if (pair.key != internal::StringNames::get_singleton().sn_name)
+                    {
+                        if (internal::VariantUtil::is_valid_name(getset_info.getter)) omitted_methods.insert(getset_info.getter);
+                        if (internal::VariantUtil::is_valid_name(getset_info.setter)) omitted_methods.insert(getset_info.setter);
+                    }
 #endif
                 }
             }

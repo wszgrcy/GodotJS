@@ -392,8 +392,14 @@ namespace jsb
                     else
                     {
 #if JSB_EXCLUDE_GETSET_METHODS
-                        if (internal::VariantUtil::is_valid_name(getset_info.getter)) omitted_methods.insert(getset_info.getter);
-                        if (internal::VariantUtil::is_valid_name(getset_info.setter)) omitted_methods.insert(getset_info.setter);
+                        // 与 bridge/jsb_object_bindings.cpp 保持一致：`name` 的 getter/setter 方法
+                        // 两边都得留着。这里漏掉会让 typings 说 `get_name()` / `set_name()` 不存在，
+                        // 而运行时其实还在，于是类型编不过但跑得动。
+                        if (property_name != internal::StringNames::get_singleton().sn_name)
+                        {
+                            if (internal::VariantUtil::is_valid_name(getset_info.getter)) omitted_methods.insert(getset_info.getter);
+                            if (internal::VariantUtil::is_valid_name(getset_info.setter)) omitted_methods.insert(getset_info.setter);
+                        }
 #endif
                     }
                 }

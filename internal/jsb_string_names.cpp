@@ -22,7 +22,7 @@ namespace jsb::internal
         sn_godot_postbind = _scs_create("_post_bind_");
 #endif
 
-        ignored_.insert(sn_name);
+
     }
 
 }

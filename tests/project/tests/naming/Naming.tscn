@@ -1,0 +1,11 @@
+[gd_scene load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://tests/naming/test-naming.js" id="1_nm1"]
+
+[node name="Naming" type="Node2D"]
+script = ExtResource("1_nm1")
+
+[node name="Label" type="Label" parent="."]
+offset_right = 40.0
+offset_bottom = 23.0
+text = "Naming"
