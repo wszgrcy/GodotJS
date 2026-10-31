@@ -66,6 +66,64 @@ class TestNaming extends Node {
 			second.name = "Dup";
 			check("同名兄弟自动加后缀", first.get_name() === "Dup" && second.get_name() === "Dup2",
 				`实际是 ${first.get_name()} / ${second.get_name()}`);
+
+			// ---- JS 自带的 name 一律不许被影响 ----
+			// 上游当初就是因为怕这个才把 name 整个排除，所以这里逐项覆盖各种自带形状。
+
+			// 不继承 Godot 类的普通类：整条原型链上都不该出现 name
+			class PlainThing {}
+			check("普通类 name", PlainThing.name === "PlainThing", `实际 ${String(PlainThing.name)}`);
+			check("普通类实例不应有 name", new PlainThing().name === undefined,
+				`实际 ${String(new PlainThing().name)}`);
+			check("普通对象不应有 name", ({}).name === undefined, `实际 ${String(({}).name)}`);
+			check("Object.prototype 未被污染",
+				Object.getOwnPropertyDescriptor(Object.prototype, "name") === undefined,
+				"Object.prototype 上出现了 name");
+
+			// 自带 name 的各种函数形状（都是 own、writable:false，与 Godot 属性不同对象）
+			const arrowFn = () => {};
+			async function asyncFn() {}
+			function* genFn() {}
+			const holder = { method() {} };
+			check("箭头函数 name", arrowFn.name === "arrowFn", `实际 ${String(arrowFn.name)}`);
+			check("async 函数 name", asyncFn.name === "asyncFn", `实际 ${String(asyncFn.name)}`);
+			check("generator 函数 name", genFn.name === "genFn", `实际 ${String(genFn.name)}`);
+			check("方法简写 name", holder.method.name === "method", `实际 ${String(holder.method.name)}`);
+
+			// 继承 Godot 类的脚本类：构造器 name 必须完好（GodotJS 靠它定脚本类名）
+			class ScriptedNode3D extends Node3D {}
+			check("脚本类构造器 name", ScriptedNode3D.name === "ScriptedNode3D",
+				`实际 ${String(ScriptedNode3D.name)}`);
+			check("脚本类 prototype.constructor.name",
+				ScriptedNode3D.prototype.constructor.name === "ScriptedNode3D",
+				`实际 ${String(ScriptedNode3D.prototype.constructor.name)}`);
+			// 读 SomeClass.prototype.name 会拿原型当 this 去跑 Godot getter。GodotJS 对**全部**
+			// 绑定属性都是这个行为（position / visible 同样报 Bad this），所以有意义的不变量不是
+			// “不报错”，而是“name 与既有属性行为一致”——它现在就是一个普通 Godot 属性。
+			const readProto = (fn) => {
+				try { void fn(); return "ok"; } catch (error) { return "threw"; }
+			};
+			const nameOnProto = readProto(() => ScriptedNode3D.prototype.name);
+			const positionOnProto = readProto(() => ScriptedNode3D.prototype.position);
+			check("prototype.name 与 prototype.position 行为一致", nameOnProto === positionOnProto,
+				`name 是 ${nameOnProto} 而 position 是 ${positionOnProto}`);
+
+			// 属性装在基类 Node.prototype 上（Node3D 继承而来），沿原型链找而不是只看 Node3D.prototype
+			let owner = Node3D.prototype;
+			let nameDesc;
+			while (owner && !nameDesc) {
+				nameDesc = Object.getOwnPropertyDescriptor(owner, "name");
+				if (!nameDesc) { owner = Object.getPrototypeOf(owner); }
+			}
+			check("Godot 原型链上存在 name 访问器",
+				nameDesc !== undefined && typeof nameDesc.get === "function" && typeof nameDesc.set === "function",
+				JSON.stringify({ found: nameDesc !== undefined, enumerable: nameDesc && nameDesc.enumerable }));
+			const enumerableKeys = [];
+			for (const key in node) {
+				enumerableKeys.push(key);
+				if (enumerableKeys.length > 2000) break;
+			}
+			console.log(`for-in 枚举到 ${enumerableKeys.length} 项，其中含 name：${enumerableKeys.includes("name")}`);
 		} catch (error) {
 			failed = true;
 			console.error(`${FAILURE_SENTINEL}: naming`);
