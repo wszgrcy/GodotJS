@@ -22,6 +22,13 @@
 
     新增 `tests/project/tests/naming/` 覆盖上述行为。
 
+-   web 运行时补上引擎类构造器的 `name`。
+
+    V8 / QuickJS / JSC 都把类名交给了引擎 API，`Node3D.name === "Node3D"` 成立；
+    web 那套的构造器是 JS 侧写的匿名函数，类名只用于日志，于是 `name` 落在变量名上，
+    构建压缩后所有引擎类都叫同一个短名（实测 `f`）。现在 `NewClass` 把类名写回 `name`，
+    属性形状与 JS 函数自带的一致（不可写、不可枚举、可配置），四个运行时表现一致。
+
 ## 1.3.0
 
 ### Minor Changes

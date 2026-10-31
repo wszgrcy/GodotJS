@@ -1337,6 +1337,12 @@ class jsbb_Engine {
             return rval;
         };
         ctor[jsbb_internal_field_count] = internal_field_count;
+        // 与 V8 / QuickJS / JSC 对齐：那三套把类名交给了引擎 API，构造器自带的 name 就是 Godot 类名。
+        // 这里是 JS 侧的匿名函数，不写回去的话 name 就是变量名（构建压缩后变成 "f" 这种短名）。
+        // 属性形状照 JS 函数自带的 name：不可写、不可枚举、可配置。
+        if (class_name_ptr != 0) {
+            Object.defineProperty(ctor, "name", { value: class_name, writable: false, enumerable: false, configurable: true });
+        }
         return this._stack.Push(ctor);
     }
 
