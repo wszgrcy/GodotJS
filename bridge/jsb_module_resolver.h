@@ -15,9 +15,16 @@ namespace jsb
         // `r_asset_path` will be set if there is an available source file in `FileAccess` which matches the given `module_id`
         virtual bool get_source_info(const String& p_module_id, ModuleSourceInfo& r_source_info) = 0;
 
-        // load source into the module
-        // `exports' will be set into `p_module.exports` if loaded successfully
-        virtual bool load(Environment* p_env, const String& p_asset_path, JavaScriptModule& p_module) = 0;
+        /**
+         * load source into the module
+         * `exports' will be set into `p_module.exports` if loaded successfully
+         *
+         * `p_defer_esm_evaluation`: 为 true 表示这是 V8 在实例化依赖图的过程中回调进来的，
+         * 调用方此刻只想要编译结果。支持原生 ESM 的实现此时只编译不执行，
+         * 求值交给最外层那一次调用统一完成，循环依赖才不会断。
+         * 不支持原生 ESM 的解析器直接忽略这个参数。
+         */
+        virtual bool load(Environment* p_env, const String& p_asset_path, JavaScriptModule& p_module, bool p_defer_esm_evaluation = false) = 0;
 
         // `p_filename_abs` the absolute file path accessible for debugger
         static bool load_from_evaluator(Environment* p_env, JavaScriptModule& p_module, const String& p_asset_path, const v8::Local<v8::Function>& p_elevator);
@@ -36,7 +43,8 @@ namespace jsb
         virtual bool get_source_info(const String& p_module_id, ModuleSourceInfo& r_source_info) override;
 
         /** load module from asset path (use FileAccessSourceReader) */
-        virtual bool load(Environment* p_env, const String& p_asset_path, JavaScriptModule& p_module) override;
+        // CommonJS 没有稍后再求值这一说，p_defer_esm_evaluation 在这里用不上
+        virtual bool load(Environment* p_env, const String& p_asset_path, JavaScriptModule& p_module, bool p_defer_esm_evaluation = false) override;
 
         DefaultModuleResolver& add_search_path(const String& p_path);
 

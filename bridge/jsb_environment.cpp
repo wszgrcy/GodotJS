@@ -12,6 +12,7 @@
 #include "jsb_worker.h"
 #include "jsb_essentials.h"
 #include "jsb_amd_module_loader.h"
+#include "jsb_native_esm_resolver.h"
 #include "jsb_thread_safe_for_nodes_scope.h"
 
 #include "../internal/jsb_path_util.h"
@@ -447,6 +448,16 @@ namespace jsb
 
     void Environment::init()
     {
+#if JSB_NATIVE_ESM && JSB_WITH_V8
+        // 排在第一个，`.mjs` 先被原生 ESM 解析器抢走，其余扩展名仍然走下面的 CommonJS 解析器
+        this->add_module_resolver<jsb::NativeESMModuleResolver>()
+            .add_search_path(jsb::internal::Settings::get_jsb_out_res_path())
+            .add_search_path("res://")
+            .add_search_path("res://node_modules")
+        ;
+        jsb::NativeESMModuleResolver::install_host_callbacks(this);
+#endif
+
         jsb::DefaultModuleResolver& resolver = this->add_module_resolver<jsb::DefaultModuleResolver>()
             .add_search_path(jsb::internal::Settings::get_jsb_out_res_path()) // default path of js source (results of compiled ts, at '.godot/GodotJS' by default)
             .add_search_path("res://") // use the root directory as custom lib path by default
@@ -491,6 +502,11 @@ namespace jsb
             debugger_.drop();
 #endif
             context->SetAlignedPointerInEmbedderData(kContextEmbedderData, nullptr);
+
+#if JSB_NATIVE_ESM && JSB_WITH_V8
+            // script id 是按 isolate 分配的，context 重建后旧的映射就认不出模块了，不能留着
+            clear_esm_module_script_ids();
+#endif
 
             module_cache_.deinit();
             context_.Reset();
@@ -1126,13 +1142,17 @@ namespace jsb
         return ModuleReloadResult::NoSuchModule;
     }
 
-    JavaScriptModule* Environment::_load_module(const String& p_parent_id, const String& p_module_id)
+    JavaScriptModule* Environment::_load_module(const String& p_parent_id, const String& p_module_id, bool p_defer_esm_evaluation)
     {
         JSB_BENCHMARK_SCOPE(JSRealm, _load_module);
 
         JavaScriptModule* resolved_module = module_cache_.find(p_module_id);
         if (resolved_module && !resolved_module->is_reloading())
         {
+            if (resolved_module->rethrow_esm_failure(isolate_))
+            {
+                return nullptr;
+            }
             return resolved_module;
         }
 
@@ -1230,6 +1250,12 @@ namespace jsb
             // check again with the resolved module_id
             resolved_module = module_cache_.find(module_id);
 
+            // 之前求值失败、或还卡在顶层 await 的模块，不能当“已经加载好”交出去
+            if (resolved_module && !resolved_module->is_reloading() && resolved_module->rethrow_esm_failure(isolate))
+            {
+                return nullptr;
+            }
+
             v8::Local<v8::Object> module_obj;
 
             // supported module properties: id, filename, cache, loaded, exports, children
@@ -1242,17 +1268,21 @@ namespace jsb
 
                     JSB_LOG(VeryVerbose, "reload module %s", module_id);
                     resolved_module->mark_as_reloaded();
-                    if (!resolver->load(this, source_info.source_filepath, *resolved_module))
+                    if (!resolver->load(this, source_info.source_filepath, *resolved_module, p_defer_esm_evaluation))
                     {
                         return nullptr;
                     }
 
-                    const impl::TryCatch try_catch_run(isolate);
-                    v8::HandleScope parse_scope(isolate);
-                    ScriptClassInfo::_parse_script_class(context, *resolved_module);
-                    if (try_catch_run.has_caught())
+                    // 原生 ESM 的导出要等整个依赖图求值完才读得到，脚本类登记交给 NativeESMModuleResolver
+                    if (!resolved_module->is_native_esm())
                     {
-                        JSB_LOG(Error, "something wrong when parsing '%s'\n%s", module_id, BridgeHelper::get_exception(try_catch_run));
+                        const impl::TryCatch try_catch_run(isolate);
+                        v8::HandleScope parse_scope(isolate);
+                        ScriptClassInfo::_parse_script_class(context, *resolved_module);
+                        if (try_catch_run.has_caught())
+                        {
+                            JSB_LOG(Error, "something wrong when parsing '%s'\n%s", module_id, BridgeHelper::get_exception(try_catch_run));
+                        }
                     }
                 }
 
@@ -1273,12 +1303,14 @@ namespace jsb
 
                 //NOTE the resolver should throw error if failed
                 //NOTE module.filename should be set in `resolve.load`
-                if (!resolver->load(this, source_info.source_filepath, module))
+                if (!resolver->load(this, source_info.source_filepath, module, p_defer_esm_evaluation))
                 {
                     return nullptr;
                 }
 
                 module.on_load(isolate, context);
+                // 原生 ESM 的导出要等整个依赖图求值完才读得到，脚本类登记交给 NativeESMModuleResolver
+                if (!module.is_native_esm())
                 {
                     const impl::TryCatch try_catch_run(isolate);
                     {

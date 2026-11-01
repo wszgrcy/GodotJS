@@ -18,6 +18,7 @@ def get_opts(platform):
         BoolVariable("use_jsc", "Prefer to use JavaScriptCore (only for macos and ios)", False),
         BoolVariable("use_quickjs", "Prefer to use QuickJS rather than the default VM on the current platform", False),
         BoolVariable("use_quickjs_ng", "Prefer to use QuickJS-NG rather than the default VM on the current platform", False),
+        BoolVariable("jsb_native_esm", "Enable the native ESM module resolver (.mjs only, V8 only, additive)", False),
     ]
 
 def configure(env):

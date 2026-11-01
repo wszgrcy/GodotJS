@@ -78,4 +78,32 @@ namespace jsb
         return *module;
     }
 
+    bool JavaScriptModule::rethrow_esm_failure(v8::Isolate* p_isolate) const
+    {
+#if JSB_NATIVE_ESM && JSB_WITH_V8
+        if (esm_evaluation_stalled)
+        {
+            impl::Helper::throw_error(p_isolate,
+                    jsb_format("the esm module '%s' is still waiting for a top-level await, its exports are not available", id));
+            return true;
+        }
+
+        if (!esm_module.IsEmpty() && esm_module.Get(p_isolate)->GetStatus() == v8::Module::kErrored)
+        {
+            // V8 把求值失败时的异常缓存在模块上，重新抛出去，行为才和“每次加载都失败”一致
+            p_isolate->ThrowException(esm_module.Get(p_isolate)->GetException());
+            return true;
+        }
+
+        if (esm_load_failed)
+        {
+            // 编译、链接失败时 V8 不会把异常存在模块上，只能给一条新错误，
+            // 但同样不能让调用方拿到一个“加载成功但导出是空的”模块
+            impl::Helper::throw_error(p_isolate, jsb_format("the esm module '%s' failed to load earlier", id));
+            return true;
+        }
+#endif
+        return false;
+    }
+
 }

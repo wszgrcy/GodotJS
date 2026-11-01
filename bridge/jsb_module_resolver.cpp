@@ -526,7 +526,7 @@ namespace jsb
         return *this;
     }
 
-    bool DefaultModuleResolver::load(Environment* p_env, const String& p_asset_path, JavaScriptModule& p_module)
+    bool DefaultModuleResolver::load(Environment* p_env, const String& p_asset_path, JavaScriptModule& p_module, bool /*p_defer_esm_evaluation*/)
     {
         internal::FileAccessSourceReader reader(p_asset_path);
         return load(p_env, p_asset_path, reader, p_module);

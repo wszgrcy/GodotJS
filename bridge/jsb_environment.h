@@ -165,6 +165,12 @@ namespace jsb
         HashMap<StringName, class IModuleLoader*> module_loaders_;
         Vector<IModuleResolver*> module_resolvers_;
 
+#if JSB_NATIVE_ESM && JSB_WITH_V8
+        // `v8::Module::ScriptId()` => 模块 id。
+        // V8 的 resolve 回调只拿得到引用方的 script_id，要靠它找回引用方的路径，相对路径才能算对。
+        HashMap<int, StringName> esm_script_ids_;
+#endif
+
 #if JSB_WITH_ESSENTIALS
         JSTimerTags<uint64_t> timer_tags_;
         internal::TTimerManager<JavaScriptTimerAction> timer_manager_;
@@ -396,7 +402,8 @@ namespace jsb
 
         // return false if something wrong with an exception thrown
         // caller should handle the exception if it's not called from js
-        JavaScriptModule* _load_module(const String& p_parent_id, const String& p_module_id);
+        // `p_defer_esm_evaluation`: 只对原生 ESM 生效，见 `IModuleResolver::load`
+        JavaScriptModule* _load_module(const String& p_parent_id, const String& p_module_id, bool p_defer_esm_evaluation = false);
 
         // manually scan changes of modules,
         // will reload IMMEDIATELY
@@ -562,6 +569,21 @@ namespace jsb
             module_resolvers_.append(resolver);
             return *resolver;
         }
+
+#if JSB_NATIVE_ESM && JSB_WITH_V8
+        void register_esm_module_script_id(int p_script_id, const StringName& p_module_id)
+        {
+            esm_script_ids_.insert(p_script_id, p_module_id);
+        }
+
+        StringName find_esm_module_id_by_script_id(int p_script_id) const
+        {
+            const StringName* found = esm_script_ids_.getptr(p_script_id);
+            return found ? *found : StringName();
+        }
+
+        void clear_esm_module_script_ids() { esm_script_ids_.clear(); }
+#endif
 
         /**
          * \brief
