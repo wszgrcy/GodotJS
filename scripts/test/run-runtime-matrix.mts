@@ -267,6 +267,18 @@ function detectBrowserExecutable() {
     return null;
 }
 
+/** 跑完一个引擎进程后，用项目统一的 sentinel 定成败。 */
+function assertProjectRunPassed(label: string, output: string) {
+    if (!output.includes(testSentinel)) {
+        throw new Error(`${label} did not reach sentinel log: ${testSentinel}`);
+    }
+
+    const failureLines = collectFailureSentinelLines(output);
+    if (failureLines.length > 0) {
+        throw new Error(`${label} reported failure sentinel(s): ${failureLines.join(" | ")}`);
+    }
+}
+
 function runHostProject(label: string, binaryPath: string) {
     runCommand(`${label} generate-types`, binaryPath, ["--headless", "--editor", "--generate-types", "--path", projectPath], {
         cwd: projectPath,
@@ -279,14 +291,7 @@ function runHostProject(label: string, binaryPath: string) {
         { cwd: projectPath }
     );
 
-    if (!output.includes(testSentinel)) {
-        throw new Error(`${label} did not reach sentinel log: ${testSentinel}`);
-    }
-
-    const failureLines = collectFailureSentinelLines(output);
-    if (failureLines.length > 0) {
-        throw new Error(`${label} reported failure sentinel(s): ${failureLines.join(" | ")}`);
-    }
+    assertProjectRunPassed(`${label} run`, output);
 
     const matchedFailurePatterns = hostFailurePatterns
         .filter((pattern) => pattern.test(output))
@@ -295,6 +300,17 @@ function runHostProject(label: string, binaryPath: string) {
     if (matchedFailurePatterns.length > 0) {
         throw new Error(`${label} matched host failure pattern(s): ${matchedFailurePatterns.join(", ")}`);
     }
+
+    // 定时器时钟：把定时器场景当主场景单独起一个进程。首帧猛推只在进程的第一帧看得见，
+    // 挂在 start.ts 的场景清单里测不到（带 bug 的引擎跑完整套清单是过的）。
+    const timerOutput = runCommand(
+        `${label} timer clock`,
+        binaryPath,
+        ["--audio-driver", "Dummy", "--headless", "--path", projectPath, "res://tests/timer/TimerClock.tscn"],
+        { cwd: projectPath }
+    );
+
+    assertProjectRunPassed(`${label} timer clock`, timerOutput);
 }
 
 function generateWebExportPreset(templatePath: string, exportPath: string) {

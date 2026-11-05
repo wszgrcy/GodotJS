@@ -134,9 +134,24 @@ void GodotJSScriptLanguage::finish()
 void GodotJSScriptLanguage::frame()
 {
     const uint64_t base_ticks = Engine::get_singleton()->get_frame_ticks();
-    const uint64_t elapsed_milli = (base_ticks - last_ticks_) / 1000ULL; // milliseconds
 
-    last_ticks_ = base_ticks;
+    uint64_t elapsed_micro = 0;
+
+    if (!timer_clock_baselined_)
+    {
+        timer_clock_baselined_ = true;
+        last_ticks_ = base_ticks;
+    }
+    else
+    {
+        elapsed_micro = base_ticks > last_ticks_ ? base_ticks - last_ticks_ : 0;
+        last_ticks_ = base_ticks;
+    }
+
+    timer_micro_accum_ += elapsed_micro;
+    const uint64_t elapsed_milli = timer_micro_accum_ / 1000ULL;
+    timer_micro_accum_ %= 1000ULL;
+
     environment_->update(elapsed_milli);
 
 #if JSB_DEBUG
