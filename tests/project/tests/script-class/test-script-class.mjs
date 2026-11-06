@@ -1,31 +1,23 @@
-// 手写的 ESM 场景脚本（不经 tsc 转换，所以 `import` 是真正的 import，不会被降级成 require）。
+// 脚本类的产物可以只有 `.mjs`（构建器输出原生 ESM 的情形）。
 //
-// 一个场景里查同一个脚本类的两条加载路径，产物都只有 `.mjs`：
+// 夹具是 `res://libs/lib-probe.ts` 加手工提交的 `.godot/GodotJS/libs/lib-probe.mjs`；
+// 源文件被 tsconfig 排除，所以 tsc 不会给它生成 `.js`。
 //
-// 一、按 `.ts` 源路径加载（`PathUtil::convert_typescript_path` 正向映射）。
-// 只拼 `.js` 的实现下引擎找不到产物，`can_instantiate()` 返回 false，继续把脚本装到节点上
-// 会在 C++ 里 FATAL 崩进程，所以先断言 `can_instantiate()` 再装脚本，让失败停在可断言的那步。
+// 引擎把 `.ts` 源路径映射成产物路径时（`PathUtil::convert_typescript_path`）如果只拼 `.js`，
+// 就找不到产物：`can_instantiate()` 返回 false，日志里是 `the javascript file is missing`。
 //
-// 二、裸模块名 import（模块解析器的搜索路径：`.godot/GodotJS`、`res://`、`res://node_modules`，
-// 见 `bridge/jsb_environment.cpp`）。静态和动态 import 都走一遍，然后 `new` 出实例。
-// `new` 这步会走 `ScriptClassInfo::instantiate`（`bridge/jsb_class_info.cpp`）：它拿产物路径用
-// `convert_javascript_path` 反推出 `.ts` 源，加载那个 Script 时才建真正的引擎对象，
-// 所以 `get_class()` 能验出「new 出来的是不是真引擎对象」。
-//
-// fixture：源 `res://libs/lib-probe.ts`（被 tsconfig 排除，所以没有 `.js` 产物），产物
-// `.godot/GodotJS/libs/lib-probe.mjs` 手工提交在那里（静态 import 在场景加载时就要解析，
-// 来不及等运行时复制）。
-//
-// `godot` 模块是 Proxy，不提供具名导出，所以只能整体取。
+// 本文件故意不经 tsc：`.ts` 会被编成 CommonJS，`import` 会变成 `require`，盖不到原生 ESM
+// 那条路。它挂在子节点而不是场景根上，是因为场景的代码生成会给根脚本生成一句 `import`，
+// 而本项目的 `.ts` 按 CommonJS 编译，`import` 一个 `.mjs` 会被 tsc 判错。
 import gd from "godot";
 import { reportTestFailure, beginAsyncTest, endAsyncTest } from "tests/test-status.js";
 import LibProbe from "libs/lib-probe";
 
 /** 脚本类源文件 */
 const SOURCE = "res://libs/lib-probe.ts";
-/** 手工提交的 ESM 产物，位于模块解析器搜索路径的第一条 */
+/** 手工提交的 ESM 产物 */
 const ARTIFACT = "res://.godot/GodotJS/libs/lib-probe.mjs";
-/** 上一轮 tsc 或旧构建可能留下的 CJS 产物，用例要确保没有 */
+/** 上一轮构建可能留下的 CJS 产物，用例要确保没有 */
 const CJS_LEFTOVER = "res://.godot/GodotJS/libs/lib-probe.js";
 
 function check(label, ok, detail) {
@@ -34,25 +26,8 @@ function check(label, ok, detail) {
     }
 }
 
-/** 一、`.ts` 源路径 → 产物：装到节点上用 */
-function checkViaScriptResource() {
-    check("产物目录里没有 .js", !gd.FileAccess.file_exists(CJS_LEFTOVER), `${CJS_LEFTOVER} 还在，用例前提不成立`);
-
-    const script = gd.ResourceLoader.load(SOURCE);
-    check("脚本资源能加载", script !== null, `ResourceLoader.load(${SOURCE}) 返回空`);
-    check(
-        "产物只有 .mjs 时脚本能实例化",
-        script.can_instantiate() === true,
-        `引擎按 ${SOURCE} 找不到产物；产物目录里只有 ${ARTIFACT}`,
-    );
-
-    const host = new gd.Node();
-    host.set_script(script);
-    check("脚本装到节点上后方法可用", host.thrice(7) === 21, "thrice(7) 不等于 21");
-    host.free();
-}
-
-/** 断言 new 出来的是真引擎对象，不是没绑定的 JS 空壳 */
+/** new 会走 ScriptClassInfo::instantiate：它把产物路径反推成 `.ts` 源，加载那个脚本时才建
+ *  真正的引擎对象，反推不到就是个没绑定的 JS 空壳（JS 方法能调，get_class() 报 Bad this）。 */
 function checkInstantiable(label, Lib) {
     check(`${label}：默认导出是类`, typeof Lib === "function", "默认导出不是类");
     const instance = new Lib();
@@ -65,8 +40,12 @@ export default class TestScriptClass extends gd.Node {
     async _ready() {
         beginAsyncTest();
         try {
-            checkViaScriptResource();
-            // 静态 import 在场景脚本求值时就解析，动态 import 在运行中解析，两条路都要盖到。
+            check("产物目录里没有 .js", !gd.FileAccess.file_exists(CJS_LEFTOVER), `${CJS_LEFTOVER} 还在，前提不成立`);
+
+            const script = gd.ResourceLoader.load(SOURCE);
+            check("脚本能实例化", script !== null && script.can_instantiate() === true, `引擎按 ${SOURCE} 找不到产物，产物目录里只有 ${ARTIFACT}`);
+            check("脚本类基类解析正确", script.get_instance_base_type() === "Node", `get_instance_base_type() 返回 ${script.get_instance_base_type()}`);
+
             checkInstantiable("静态 import", LibProbe);
 
             const mod = await import("libs/lib-probe");

@@ -19,9 +19,11 @@
 
 回归用例在 `tests/project/tests/script-class/`，挂在 `pnpm test` 的场景清单里。夹具是
 `res://libs/lib-probe.ts`（被 tsconfig 排除，所以没有 `.js` 产物）加手工提交的
-`.godot/GodotJS/libs/lib-probe.mjs`。用例查三条路：`ResourceLoader.load` 按 `.ts` 源加载后
-`can_instantiate()` 为真、装到节点上方法可用；静态 `import` 和动态 `import` 用裸模块名拿到
-同一个类，并且 `new` 出来的实例 `get_class()` 返回 `"Node"`。`new` 那步会走
-`ScriptClassInfo::instantiate`，它把产物路径反推成 `.ts` 源、加载那个脚本时才建真正的引擎
-对象，反推不到就只是个没绑定的 JS 空壳（JS 方法能调，`get_class()` 报 Bad this）。
-先断言 `can_instantiate()` 再装脚本，是为了让失败停在可断言的那一步，而不是崩进程。
+`.godot/GodotJS/libs/lib-probe.mjs`。根脚本 `test-script-class.ts` 断言 `ResourceLoader.load`
+加载 `.ts` 源之后 `can_instantiate()` 为真、脚本类基类解析成 `Node`；只拼 `.js` 的实现下
+`can_instantiate()` 返回 false，继续把脚本装到节点上会 FATAL 崩进程，所以断言停在那里。
+子节点 `import-probe.mjs` 是手写的原生 ESM（`.ts` 会被编成 CommonJS，`import` 会变成
+`require`，盖不到这条路），用裸模块名静态和动态 `import` 同一个类，各自 `new` 出实例并断言
+`get_class()` 返回 `"Node"`。`new` 会走 `ScriptClassInfo::instantiate`，它把产物路径反推成
+`.ts` 源、加载那个脚本时才建真正的引擎对象，反推不到就只是个没绑定的 JS 空壳（JS 方法能调，
+`get_class()` 报 Bad this）。
