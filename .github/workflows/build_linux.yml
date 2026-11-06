@@ -25,6 +25,7 @@ env:
     strict_checks=yes
     module_text_server_fb_enabled=yes
     "accesskit_sdk_path=${{ github.workspace }}/${{ inputs.version_mm == '4.5' && 'accesskit-c-0.17.0' || (inputs.version_mm == '4.6' && 'accesskit-c-0.18.0' || 'accesskit-c-0.22.3') }}"
+    jsb_native_esm=yes
     skip_js_runtime=yes
 #  ASAN_OPTIONS: color=always:print_suppressions=1:suppressions=${{ github.workspace }}/misc/error_suppressions/asan.txt
 #  LSAN_OPTIONS: color=always:print_suppressions=1:suppressions=${{ github.workspace }}/misc/error_suppressions/lsan.txt

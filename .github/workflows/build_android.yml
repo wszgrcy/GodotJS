@@ -27,6 +27,7 @@ env:
     module_text_server_fb_enabled=yes
     tests=no
     swappy=yes
+    jsb_native_esm=yes
     skip_js_runtime=yes
 
 # We only build template release - most developers will use a desktop device for editor

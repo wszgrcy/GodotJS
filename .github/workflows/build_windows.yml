@@ -29,6 +29,7 @@ env:
     d3d12=yes
     "angle_libs=${{ github.workspace }}/"
     "accesskit_sdk_path=${{ github.workspace }}/${{ inputs.version_mm == '4.5' && 'accesskit-c-0.17.0' || (inputs.version_mm == '4.6' && 'accesskit-c-0.18.0' || 'accesskit-c-0.22.3') }}"
+    jsb_native_esm=yes
     skip_js_runtime=yes
   SCONS_CACHE_MSVC_CONFIG: true
   PYTHONIOENCODING: utf8
