@@ -1,6 +1,12 @@
 # Godot 4+ specific ignores
 !.godot/.gdignore
 !node_modules/.gdignore
-.godot/
+.godot/**
 node_modules/
 .idea
+
+# 手工提交的脚本类产物夹具，见 tests/script-class/test-script-class.mjs
+# 前两条只放行目录 (git 不会进入被排除的目录)，第三条才放行文件本身
+!.godot/GodotJS/
+!.godot/GodotJS/libs/
+!.godot/GodotJS/libs/lib-probe.mjs

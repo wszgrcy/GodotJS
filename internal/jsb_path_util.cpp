@@ -85,10 +85,21 @@ namespace jsb::internal
         if (p_source_path.ends_with("." JSB_TYPESCRIPT_EXT))
         {
             jsb_checkf(p_source_path.begins_with("res://"), "can not proceed typescript sources not under the project directory");
-            const String replaced = Settings::get_jsb_out_res_path().path_join(
-                p_source_path.substr(std::size("res://") - 1, p_source_path.length() - (int) std::size("res://") - 1)
-                + JSB_JAVASCRIPT_EXT);
-            return replaced;
+            // 去掉 "res://" 前缀与结尾的 ".ts"，得到产物在输出目录下的路径主干
+            const String stem = Settings::get_jsb_out_res_path().path_join(
+                p_source_path.substr(std::size("res://") - 1, p_source_path.length() - (int) std::size("res://") - 2));
+            // 产物扩展名不唯一：CJS 走 `.js` / `.cjs`，原生 ESM 走 `.mjs`。探测顺序与
+            // `DefaultModuleResolver::check_implicit_source_path` 保持一致，已编译好 CJS 产物的
+            // 工程仍然一次命中。三者都不存在时回落到 `.js`，让「产物缺失」的报错仍指向最常见的名字。
+            for (const char* extension : { "." JSB_JAVASCRIPT_EXT, "." JSB_COMMONJS_EXT, "." JSB_MODULE_EXT })
+            {
+                const String candidate = stem + extension;
+                if (FileAccess::exists(candidate))
+                {
+                    return candidate;
+                }
+            }
+            return stem + "." JSB_JAVASCRIPT_EXT;
         }
         return p_source_path;
     }

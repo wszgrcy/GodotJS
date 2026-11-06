@@ -108,5 +108,8 @@
         /* Completeness */
         // "skipDefaultLibCheck": true,                      /* Skip type checking .d.ts files that are included with TypeScript. */
         "skipLibCheck": true /* Skip type checking all .d.ts files. */
-    }
+    },
+    // lib-probe.ts 故意不参与编译：它的产物由手写的 `.mjs` 提供，用来复现「构建器只输出
+    // `.mjs`」的情形。tsc 一旦生成 `.js`，tests/script-class 那个用例的前提就没了。
+    "exclude": ["libs/lib-probe.ts"]
 }
