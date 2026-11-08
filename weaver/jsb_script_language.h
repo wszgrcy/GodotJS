@@ -113,6 +113,10 @@ private:
 
     Ref<RegEx> ts_class_name_matcher_;
 
+    // [JS] 打包器（esbuild 等）产出的默认导出：`export { Name as default }`，
+    // 类本身是匿名的（`var Name = class extends BaseName {}`），类名只能取那个变量名。
+    Ref<RegEx> js_class_name_matcher3_;
+
     // [JS] export & declare in two lines, matches 'class ClassName extends BaseName' + 'exports.default = ClassName'
     Ref<RegEx> js_class_name_matcher2_;
 

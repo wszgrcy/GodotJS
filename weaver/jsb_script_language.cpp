@@ -53,9 +53,13 @@ GodotJSScriptLanguage::GodotJSScriptLanguage()
     JSB_BENCHMARK_SCOPE(GodotJSScriptLanguage, Construct);
     jsb_check(!singleton_);
     singleton_ = this;
-    js_class_name_matcher1_ = RegEx::create_from_string(R"(\s*exports.default\s*=\s*class\s*(\w+)\s+extends\s+(\w+))");
+    // 基类允许写成限定名（`extends gd.Node3D`），取最后一段作为基类名，否则会把命名空间 `gd` 当成基类。
+    // 非捕获组不改变捕获组的数量，调用处仍按原来的组号取值。
+    js_class_name_matcher1_ = RegEx::create_from_string(R"(\s*exports.default\s*=\s*class\s*(\w+)\s+extends\s+(?:\w+\.)*(\w+))");
     js_class_name_matcher2_ = RegEx::create_from_string(R"(\s*exports.default\s*=\s*(\w+)\s*;?)");
-    ts_class_name_matcher_ = RegEx::create_from_string(R"(\s*(@[tT]ool\s*\(\s*\)\s*\n*\s*)?export\s+default\s+class\s+(\w+)(\s*<)?[^\n]*(?:>|\s+)extends\s+(\w+))");
+    // 打包器产出的默认导出：`export { Name as default }`（可以带其它导出项）。
+    js_class_name_matcher3_ = RegEx::create_from_string(R"(export\s*\{[^{}]*\b(\w+)\s+as\s+default\b[^{}]*\})");
+    ts_class_name_matcher_ = RegEx::create_from_string(R"(\s*(@[tT]ool\s*\(\s*\)\s*\n*\s*)?export\s+default\s+class\s+(\w+)(\s*<)?[^\n]*(?:>|\s+)extends\s+(?:\w+\.)*(\w+))");
     jsb::internal::StringNames::create();
 }
 
@@ -348,7 +352,11 @@ String GodotJSScriptLanguage::get_global_class_name(const String& p_path, String
     // And for simplicity, we use regex to extract the class name from the source code instead of using ANTLR or similar.
     // Please follow the rules of the class name declaration in the source code.
     //     * .ts files: `export default class ClassName extends BaseClassName`
-    //     * .js files: `class ClassName extends BaseClassName` and `exports.default = ClassName` (with or without `;`)
+    //     * .js / .cjs files (CommonJS 产物): `class ClassName extends BaseClassName` and `exports.default = ClassName` (with or without `;`)
+    //     * .mjs files (原生 ESM 产物): 与 .ts 同形，`export default class ClassName extends BaseClassName`
+    //     * 打包器（esbuild 等）产出的 .mjs: `var ClassName = class extends BaseClassName {}` + `export { ClassName as default }`
+    //
+    // 基类可以写成限定名（`extends gd.Node3D`），只取最后一段。
 
     // And, we do not support `r_is_abstract` here, please define all abstract class by not exporting it as `default`.
     // It should be equivalent and enough for TS/JS since we do not rely on GodotJSScript to use abstract classes in TS/JS sources.
@@ -382,7 +390,7 @@ String GodotJSScriptLanguage::get_global_class_name(const String& p_path, String
             if (r_base_type)
             {
                 // then, check 'exports.default = ClassName'
-                const Ref<RegEx> base_matcher = RegEx::create_from_string(jsb::internal::format(R"(\s*class\s*%s\s*extends\s*(\w+)\s*\{?)", class_name));
+                const Ref<RegEx> base_matcher = RegEx::create_from_string(jsb::internal::format(R"(\s*class\s*%s\s*extends\s+(?:\w+\.)*(\w+)\s*\{?)", class_name));
                 const Ref<RegExMatch> base_match = base_matcher->search(source);
                 if (base_match.is_valid() && base_match->get_group_count() == 1)
                 {
@@ -390,6 +398,39 @@ String GodotJSScriptLanguage::get_global_class_name(const String& p_path, String
                 }
             }
             return class_name;
+        }
+
+        // 原生 ESM 产物（`.mjs`，以及 package.json 里 type:module 的 `.js`）里没有 `exports.default`，
+        // 类声明的形状与 .ts 相同，所以复用同一条正则。
+        // 必须放在两条 CommonJS 正则之后：CommonJS 产物里不会出现 `export default class`，
+        // 先后顺序不会让两种模块格式互相误判。
+        jsb_check(!ts_class_name_matcher_.is_null());
+        const Ref<RegExMatch> match_esm = ts_class_name_matcher_->search(source);
+        if (match_esm.is_valid() && match_esm->get_group_count() == 4)
+        {
+            if (r_base_type) *r_base_type = match_esm->get_string(4);
+            return match_esm->get_string(2);
+        }
+
+        // 打包器产出的形状：类是匿名类表达式赋给一个变量，再用 `export { Name as default }` 导出，
+        // 类名只能取那个变量名：
+        //     var CB = class extends CharacterBody3D { ... }
+        //     export { CB as default };
+        // 基类必须真的从 `= class ... extends ...` 里抽到才登记：抽不到就分不清
+        // 「默认导出是个 Godot 脚本类」还是「默认导出是个普通对象 / 函数」。
+        jsb_check(!js_class_name_matcher3_.is_null());
+        const Ref<RegExMatch> match3 = js_class_name_matcher3_->search(source);
+        if (match3.is_valid() && match3->get_group_count() == 1)
+        {
+            const String class_name = match3->get_string(1);
+            const Ref<RegEx> base_matcher = RegEx::create_from_string(jsb::internal::format(
+                    R"((?:var|let|const)\s+%s\s*=\s*class\s+(?:\w+\s+)?extends\s+(?:\w+\.)*(\w+))", class_name));
+            const Ref<RegExMatch> base_match = base_matcher->search(source);
+            if (base_match.is_valid() && base_match->get_group_count() == 1)
+            {
+                if (r_base_type) *r_base_type = base_match->get_string(1);
+                return class_name;
+            }
         }
     }
     else
