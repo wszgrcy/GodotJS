@@ -2,6 +2,9 @@
 #include "jsb_docked_panel.h"
 #include "jsb_export_plugin.h"
 
+#include "editor/editor_node.h"
+#include "editor/editor_undo_redo_manager.h"
+
 #if GODOT_4_7_OR_NEWER
 #include "core/object/callable_mp.h"
 #include "scene/main/scene_tree.h"
@@ -20,6 +23,17 @@ enum
 namespace
 {
     GodotJSEditorPlugin* singleton_ = nullptr;
+
+    // 这个场景自上次保存以来内容有没有变过。
+    // 编辑器失焦时会把没改过的场景也原样重写一遍（Editor Settings 的 Save on Focus Loss），
+    // 那种保存重生成的类型与上一版一模一样，白折腾。
+    // Godot 是在发出 scene_saved 之后才把场景标记为已保存的，所以信号回调里读到的还是保存之前的状态。
+    // 路径对不上编辑器当前打开的场景时返回 true，照常生成。
+    bool scene_content_modified(const String& p_path)
+    {
+        const int history_id = EditorNode::get_editor_data().get_scene_history_id_from_path(p_path);
+        return EditorUndoRedoManager::get_singleton()->is_history_unsaved(history_id);
+    }
 }
 
 void GodotJSEditorPlugin::_bind_methods()
@@ -543,6 +557,8 @@ void GodotJSEditorPlugin::collect_invalid_files(const String& p_path, Vector<Str
 
 void GodotJSEditorPlugin::_on_scene_saved(const String& p_path)
 {
+    if (!scene_content_modified(p_path)) return;
+
     if (!jsb::internal::Settings::get_autogen_scene_dts_on_save()) return;
 
     Vector<String> paths = { p_path };
