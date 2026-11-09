@@ -105,6 +105,15 @@ namespace jsb::internal
                 _GLOBAL_DEF(EntryScriptPath, String(), JSB_SET_RESTART(false), JSB_SET_IGNORE_DOCS(false), JSB_SET_BASIC(true),  JSB_SET_INTERNAL(false));
             }
 
+            {
+                PropertyInfo IcuDataPath;
+                IcuDataPath.type = Variant::STRING;
+                IcuDataPath.name = Settings::kIcuDataPathSetting;
+                IcuDataPath.hint = PROPERTY_HINT_FILE;
+                IcuDataPath.hint_string = "*.dat";
+                _GLOBAL_DEF(IcuDataPath, String(), JSB_SET_RESTART(true), JSB_SET_IGNORE_DOCS(false), JSB_SET_BASIC(true), JSB_SET_INTERNAL(false));
+            }
+
             _GLOBAL_DEF(kRtPackagingWithSourceMap, true, false);
 
             {
@@ -274,6 +283,12 @@ namespace jsb::internal
     {
         init_settings();
         return GLOBAL_GET(kRtEntryScriptPath);
+    }
+
+    String Settings::get_icu_data_path()
+    {
+        init_settings();
+        return GLOBAL_GET(kIcuDataPathSetting);
     }
 
     bool Settings::get_camel_case_bindings_enabled()

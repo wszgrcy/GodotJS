@@ -19,6 +19,7 @@ export default class Start extends Node {
                 "res://tests/singleton/Singleton.tscn",
                 "res://tests/extend/Extend.tscn",
                 "res://tests/naming/Naming.tscn",
+                "res://tests/intl/Intl.tscn",
                 "res://tests/script-class/ScriptClass.tscn",
                 "res://tests/papaparse/Papaparse.tscn",
                 "res://tests/os-executor/OSExecutor.tscn",

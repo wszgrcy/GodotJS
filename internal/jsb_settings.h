@@ -3,12 +3,16 @@
 
 #include <cstdint>
 #include "../compat/jsb_compat.h"
+#include "jsb_macros.h"
 
 namespace jsb::internal
 {
     class Settings
     {
     public:
+        // 项目设置里用来指定 ICU 数据文件（icudtl.dat）位置的键，留空表示让引擎自己找。
+        static constexpr char kIcuDataPathSetting[] = JSB_MODULE_NAME_STRING "/runtime/intl/icu_data_path";
+
         static bool is_bridge_logging_enabled();
         static uint16_t get_debugger_port();
         static String get_debugger_source_map_base_url();
@@ -37,6 +41,11 @@ namespace jsb::internal
         static PackedStringArray get_additional_search_paths();
 
         static String get_entry_script_path();
+
+        /**
+         * ICU 数据文件（icudtl.dat）的位置，来自项目设置；空串表示没指定，由引擎自己找。
+         */
+        static String get_icu_data_path();
 
         static bool get_camel_case_bindings_enabled();
 

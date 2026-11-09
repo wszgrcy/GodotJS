@@ -82,11 +82,23 @@ jobs:
           }
 
           mkdir -p tests/bin
+
+          # 引擎启动时在自己旁边找 icudtl.dat（Intl.* 与 Date.prototype.toLocale* 要用），
+          # staging 只拷二进制会把这份数据落下，所以拷二进制时一起拷过来。
+          stage_icu_data() {
+            local icu
+            icu="$(pick_one "$1" 'icudtl.dat' || true)"
+            if [ -n "$icu" ]; then
+              cp "$icu" tests/bin/icudtl.dat
+            fi
+          }
+
           case "${{ matrix.runtime }}" in
             host-v8)
               src="$(pick_one runtime-artifacts/host-v8 'godot.linuxbsd.editor.*')" || fail_missing "host-v8 binary"
               cp "$src" tests/bin/godot-host-v8
               chmod +x tests/bin/godot-host-v8
+              stage_icu_data runtime-artifacts/host-v8
               ;;
             host-qjs)
               src="$(pick_one runtime-artifacts/host-qjs 'godot.linuxbsd.editor.*')" || fail_missing "host-qjs binary"
@@ -104,6 +116,7 @@ jobs:
               cp "$host_src" tests/bin/godot-host-v8
               cp "$web_src" tests/bin/godot-web-browser-template_debug.zip
               chmod +x tests/bin/godot-host-v8
+              stage_icu_data runtime-artifacts/host-v8
               ;;
             web-qjs)
               host_src="$(pick_one runtime-artifacts/host-v8 'godot.linuxbsd.editor.*')" || fail_missing "web-qjs host-v8 binary"
@@ -111,6 +124,7 @@ jobs:
               cp "$host_src" tests/bin/godot-host-v8
               cp "$web_src" tests/bin/godot-web-qjs-template_debug.zip
               chmod +x tests/bin/godot-host-v8
+              stage_icu_data runtime-artifacts/host-v8
               ;;
           esac
 
