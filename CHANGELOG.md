@@ -1,5 +1,129 @@
 # @godot-js/editor
 
+## 1.4.0
+
+### Minor Changes
+
+-   93f837c: 新增原生 ESM 模块解析器（`jsb_native_esm`，仅 V8，默认关闭）
+
+    打开开关后，`.mjs` 文件不再被包成 CommonJS 函数执行，而是交给 V8 自己的模块机制编译，
+    `import` / `export` 按标准语义工作：
+
+    -   默认导出、具名导出、`export * from`、命名空间导入
+    -   循环依赖（依赖只编译不执行，求值统一放在最外层，不会读到半初始化的模块）
+    -   顶层 `await`：能在同步里算完的（`await` 一个已就绪的 Promise）正常拿到值；
+        等的是真实异步操作时直接报错，并用 V8 的信息指出卡在哪个文件，不会返回半成品导出
+    -   `import()` 动态导入，返回真正的 Promise
+    -   `import.meta.url` 与 `import.meta.resolve()`（值是引擎路径 `res://...`，不是 `file://` URL）
+    -   CommonJS 里 `require("./x.mjs")` 拿到的是该模块的命名空间
+    -   `.mjs` 默认导出一个继承引擎类型的类时，照样登记成 Godot 脚本类
+
+    从 `.mjs` 里 import 非 ESM 的东西（`.js` / `.cjs` / `.json` / `godot`）时，会自动生成一个
+    转发模块：默认导出是它的 `module.exports` / 解析后的 JSON / 引擎命名空间，同时按属性给出
+    具名导出。属性名不是合法标识符的（`"some-name"`、`"0"`）走 ESM 的字符串导出名，不会丢属性。
+
+    ```js
+    import cjs, { from_cjs } from "./legacy.js"; // 默认导出 = module.exports
+    import data from "./data.json";
+    import gd from "godot";
+    const { Node, Vector2 } = gd; // 引擎类要这样拿，见下面的限制
+    ```
+
+    失败处理对齐 Node：加载失败的模块不会留在"已加载"状态。同一个模块再 `require` 一次，
+    会把 V8 缓存在模块上的原始异常重新抛出去（Node 的 `ModuleWrap::runSync` 就是这么做的），
+    不会出现"第二次加载成功、拿到一个空模块"。顶层 await 卡住的模块同理，且 V8 不允许对
+    求值中的模块重复求值，所以它被标记为不可用。
+
+    其余扩展名（`.js` / `.cjs` / `.json`）仍走原来的 CommonJS 路径，行为不变。
+
+    已知限制：
+
+    -   加载失败过的模块（语法错、缺依赖、求值抛错、顶层 await 卡住）会一直失败，直到模块缓存重建；
+        改了文件要等上下文重建才能重新试（Node 的 ESM 缓存也是这个行为）
+    -   说明符可以省略扩展名（`import "./hello"` 能解析到 `hello.mjs`），比 Node 的 ESM 宽松
+    -   **`godot` 模块只能默认导入**。它是个按需解析的 Proxy，列不出自有属性，所以
+        `import { Node } from "godot"` 会在链接阶段报"does not provide an export named 'Node'"。
+        写成 `import gd from "godot"` 再 `gd.Node` 或解构即可。Node 对无法静态分析导出的模块
+        也是同样行为。打包成 CommonJS 的 TS 代码不受影响（具名 import 会变成属性访问）。
+    -   转发模块导出目标对象的所有自有属性，包括不可枚举的；Node 只导可枚举的。
+        `module.exports.default` 不会单独导出（`default` 已被默认导出占用），但 `cjs.default` 能取到。
+    -   只有 V8 实现有，QuickJS / JavaScriptCore 没有对应实现
+    -   所有入口都是同步的，所以真正需要异步等待的顶层 await 用不了（Node 的入口是异步的）
+    -   `import.meta` 只填 `url` 和 `resolve`，没有 `main` / `filename` / `dirname`
+    -   转发模块是生成一段 ESM 源码再编译（Node 用 V8 的 SyntheticModule，不生成源码），
+        每个非 ESM 依赖多一次编译
+
+    编译开关：`scons ... jsb_native_esm=yes`，实现见 `bridge/jsb_native_esm_resolver.{h,cpp}`，
+    用例见 `tests/test_jsb_esm_runtime.h` 与 `tests/project/tests/esm/`。
+
+-   2207357: 发布包打开原生 ESM（构建参数 `jsb_native_esm=yes`）
+
+    之前这个能力只在源码自编译、且手动传了开关时才有，发布包里没编进去，
+    `.mjs` 在发布包里仍然只能按 CommonJS 执行。现在 Linux / Windows / macOS /
+    Android / iOS 的构建统一带上该开关，发布包里的 `.mjs` 直接走 V8 的模块机制。
+
+    开关本身没动，默认仍是关闭：自己编引擎的人不传参数就保持原有行为。
+    web 平台用的是浏览器自己的 JS 引擎，没有 V8，这个开关对它不起作用，所以没加。
+
+### Patch Changes
+
+-   28614e5: 修复 JS 定时器在高帧率下静默停摆，以及启动阶段注册的定时器提前触发
+
+    引擎每帧把「这一帧过了多久」交给 JS 侧的定时器轮，原来这个量是 `(本帧时间戳 - 上帧时间戳) / 1000`
+    的整数毫秒，余数直接丢掉。一帧的墙上时间不足 1ms 时（无头轻场景，或加了 `--fixed-fps` 关掉帧率
+    节流之后），每帧交出去的增量恒为 0，定时器轮再也推进不了，所有 `setTimeout` / `setInterval` /
+    `setImmediate`，以及建立在它们之上的 `await`、RxJS `asyncScheduler` 等，会**不报错地永久停摆**。
+
+    现在帧间隔按微秒累加，攒满 1ms 才交给定时器轮，余数不再丢。
+
+    顺带修掉另一处：`last_ticks_` 初值是 0，第一帧算出的增量等于「引擎从启动到现在的总时长」，
+    这一帧会把定时器轮猛推一大截，启动阶段注册的 `setTimeout(fn, 50)` 会在第一帧被当作早已过期而
+    当场触发。现在第一帧交 0 增量，从第二帧起交真实帧间隔（宁可晚一帧，不提前）。
+
+    回归用例在 `tests/project/tests/timer/`，由 `pnpm test`（`run-runtime-matrix.mts` 里标了
+    `timer clock` 的那一步）在跑每个宿主运行时时单独起一个进程带跑。它守住的是首帧猛推
+    那一条；亚毫秒截断要一帧真实耗时低于 1ms 才暴露，本用例不覆盖。
+
+-   4360417: 修复主线程卡顿之后注册的定时器提前触发
+
+    JS 定时器轮不读时钟，只累加每次推进进来的毫秒数。主线程被占住期间不推进，而定时器到期时间
+    按 `delay + 当前时钟` 计算，于是卡顿之后注册的 `setTimeout(fn, 5000)`，欠下的那段会在下一次
+    推进时计入已等待时长，定时器提前触发，最坏情况当场触发（看门狗只过 2 秒就报超时 5 秒）。
+
+    定时器时钟改为自行读取 `OS::get_ticks_usec()`，调用方只决定推进时机，不再传入帧间隔；注册
+    定时器时把已流逝而未入钟的时长补进首次延时。`Environment::update()` 不再接收增量参数，
+    Worker 侧同步调整。附带修正主环境喂入上一帧时长导致的定时器天然晚一帧触发。
+
+    回归用例在 `tests/project/tests/timer/`，覆盖卡顿后注册 `setTimeout`、长延时定时器、
+    `setInterval` 首次延时与回调内卡顿后再注册。未打补丁判负（卡 1.2 秒后 `setTimeout(500)`
+    实际 0ms 触发），打过判过。
+
+-   05520c9: 脚本类产物允许是 `.mjs`：`.ts` 源路径不再硬拼成 `.js`
+
+    `PathUtil::convert_typescript_path` 把 `.ts` 源路径映射成编译产物的路径，原来只在结尾拼
+    `.js`。于是产物只有 `.mjs` 时（构建器输出原生 ESM 的情形）引擎找不到产物：脚本资源的
+    `can_instantiate()` 返回 false，日志里是 `the javascript file is missing`；要是继续把脚本装到
+    节点上，会在 C++ 里 `FATAL` 崩进程，JS 侧捕获不到。
+
+    这是原生 ESM 落地时漏改的一处。反向映射 `convert_javascript_path`（产物 → `.ts`）和
+    `DefaultModuleResolver::check_implicit_source_path`（模块名 → 产物）早就认 `.mjs` 了，只有
+    正向这一条还写死 `.js`。
+
+    现在正向也按 `.js` → `.cjs` → `.mjs` 依次探测文件是否存在，顺序与
+    `check_implicit_source_path` 保持一致，只编好 CJS 产物的工程仍然一次命中。三者都不存在时
+    回落到 `.js`，让「产物缺失」的报错仍指向最常见的名字，日志文案不变。
+
+    回归用例在 `tests/project/tests/script-class/`，挂在 `pnpm test` 的场景清单里。夹具是
+    `res://libs/lib-probe.ts`（被 tsconfig 排除，所以没有 `.js` 产物）加手工提交的
+    `.godot/GodotJS/libs/lib-probe.mjs`。根脚本 `test-script-class.ts` 断言 `ResourceLoader.load`
+    加载 `.ts` 源之后 `can_instantiate()` 为真、脚本类基类解析成 `Node`；只拼 `.js` 的实现下
+    `can_instantiate()` 返回 false，继续把脚本装到节点上会 FATAL 崩进程，所以断言停在那里。
+    子节点 `import-probe.mjs` 是手写的原生 ESM（`.ts` 会被编成 CommonJS，`import` 会变成
+    `require`，盖不到这条路），用裸模块名静态和动态 `import` 同一个类，各自 `new` 出实例并断言
+    `get_class()` 返回 `"Node"`。`new` 会走 `ScriptClassInfo::instantiate`，它把产物路径反推成
+    `.ts` 源、加载那个脚本时才建真正的引擎对象，反推不到就只是个没绑定的 JS 空壳（JS 方法能调，
+    `get_class()` 报 Bad this）。
+
 ## 1.3.2
 
 ### Patch Changes
@@ -522,9 +646,9 @@
         Wrapping the doc text fields in `DTR()` makes `godot --headless --editor --generate-types
 
     -l zh_Hans` emit the official Simplified Chinese class reference, i.e. the same strings the
-    editor Help panel shows. This works for the locales the engine ships doc translations for
-    (`zh_Hans`, `zh_Hant`, `fr`, `es`, `ru`, `ko`, ...). The locale has to match the doc catalog
-    exactly: `zh_CN` is not one of them and silently falls back to English.
+editor Help panel shows. This works for the locales the engine ships doc translations for
+(`zh_Hans`, `zh_Hant`, `fr`, `es`, `ru`, `ko`, ...). The locale has to match the doc catalog
+exactly: `zh_CN` is not one of them and silently falls back to English.
 
         With the default locale the text stays English, since `DTR()` returns the source string when
         no doc translation is loaded.
