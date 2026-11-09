@@ -152,6 +152,15 @@ namespace jsb
         const v8::Local<v8::Function> func = info[0].As<v8::Function>();
         internal::TimerHandle handle;
 
+        // 定时器轮只累加每次推进进来的毫秒数，自己不看表。从上一次推进到现在已经流逝的真实时间
+        // 还没进时钟，直接按 rate 武装会把到期时间算在一个落后的钟上：主线程刚被占住过一段时间时，
+        // 欠的那段会在下一次推进时被算成「已经等过了」，定时器就提前触发了。把这段补进首次延时。
+        // setImmediate 的 rate 不是时长（固定 1ms，含义是「下一次推进就响」），不补。
+        static constexpr bool compensate_pending = TimerType != InternalTimerType::Immediate;
+        const uint64_t first_delay = compensate_pending
+            ? static_cast<uint64_t>(rate > 0 ? rate : 0) + Environment::wrap(isolate)->timer_clock_pending_msec()
+            : 0;
+
         if (argc > extra_arg_index)
         {
             JavaScriptTimerAction action(v8::Global<v8::Function>(isolate, func), argc - extra_arg_index);
@@ -160,12 +169,12 @@ namespace jsb
                 action.store(index - extra_arg_index, v8::Global<v8::Value>(isolate, info[index]));
             }
             Environment::wrap(isolate)->get_timer_manager().set_timer(handle,
-                std::move(action), rate, loop);
+                std::move(action), rate, loop, first_delay);
         }
         else
         {
             Environment::wrap(isolate)->get_timer_manager().set_timer(handle,
-                JavaScriptTimerAction(v8::Global<v8::Function>(isolate, func), 0), rate > 0 ? rate : 0, loop);
+                JavaScriptTimerAction(v8::Global<v8::Function>(isolate, func), 0), rate > 0 ? rate : 0, loop, first_delay);
         }
         // TODO: V8 update. Once we update V8 past 12.6.221 we can skip the cast to double
         info.GetReturnValue().Set((double) (int64_t) handle);

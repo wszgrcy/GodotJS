@@ -2,22 +2,34 @@ import { Node } from "godot";
 import { reportTestCompleted, reportTestFailure } from "../test-status";
 
 /**
- * 定时器时钟用例：引擎每帧给 JS 定时器轮喂一次「这一帧过了多久」，定时器轮只把收到的
- * 毫秒数累加，自己不看表。喂少了定时器就跟着变慢，而且不报错，所以只能从外面量。
+ * 定时器时钟用例：JS 定时器轮不看表，只累加每次推进进来的毫秒数。时钟走得准不准、
+ * 武装定时器时用的是不是当前的钟，从里面看不出来，只能从外面量。
  *
- * 守住的是「首帧猛推」：第一帧喂的是「本帧时间戳减 0」，等于把引擎从启动到第一帧的总时长
- * 一次性灌进定时器轮，于是启动阶段注册的 `setTimeout(fn, 50)` 会在第一帧立刻触发
- * （墙上时间才 0ms）。
+ * 守住两件事：
+ *
+ * 1. 首帧猛推。时钟第一次推进之前不能把引擎启动时长灌进去，否则启动阶段注册的
+ *    `setTimeout(fn, 50)` 会在第一帧立刻触发（墙上时间才 0ms）。
+ * 2. 卡顿之后武装的定时器不能提前响。主线程被占住期间时钟不推进，欠下的那段真实时间
+ *    会在下一次推进时补上；如果武装定时器时不把它补进首次延时，到期时间就是拿一个落后的
+ *    钟算出来的，欠的那段会被算成「已经等过了」，定时器当场就响。典型后果：测试看门狗
+ *    明明只过了 2 秒就报「超时 5 秒」。
  *
  * 为什么单独起进程、把本场景当主场景跑，而不是挂进 `start.ts` 的场景清单：首帧猛推只在
  * 进程的第一帧看得见，等 `start.ts` 把场景加载进来时早就过去了。跑法见
  * `run-runtime-matrix.mts` 里标了 `timer clock` 的那一步。
  *
  * 定时器停摆时 `await` 根本不返回，所以整体挂一个墙上时间兜底，到点直接判负退出。
+ *
+ * 改完本文件要重跑一次 `tests/project` 的构建（`pnpm build`，或直接 `node_modules/.bin/tsc`）。
+ * 引擎读的是 `tests/project/.godot/GodotJS/` 下的编译产物，不重编就会拿着旧产物跑，
+ * 用例会“通过”但其实跑的不是你改的那份。
  */
 
 /** 整个用例的时间预算，超了就判负。 */
-const BUDGET_MS = 5000;
+const BUDGET_MS = 20000;
+
+/** 模拟主线程被占住的时长。要明显大于被测定时器的延时，才能暴露「延时被欠账吃掉」。 */
+const STALL_MS = 1200;
 
 /** 定时器轮的最小粒度是 10ms（`kJiffies`），判定下界要留出这段量化误差。 */
 const JIFFIE_SLACK_MS = 10;
@@ -32,13 +44,21 @@ function check(label: string, ok: boolean, detail: string): void {
 	}
 }
 
+/** 把主线程占住 p_ms。占住期间引擎不跑帧，JS 定时器时钟也就停在原地。 */
+function busy(p_ms: number): void {
+	const stop = Date.now() + p_ms;
+	while (Date.now() < stop) {
+		// 空转
+	}
+}
+
 export default class TimerClock extends Node {
 	private startedAtMs = Date.now();
 	private finished = false;
 
 	_ready(): void {
 		setTimeout(() => {
-			this.finish("超过 5000ms 没跑完，定时器没有触发");
+			this.finish(`超过 ${String(BUDGET_MS)}ms 没跑完，定时器没有触发`);
 		}, BUDGET_MS);
 		void this.run();
 	}
@@ -63,6 +83,7 @@ export default class TimerClock extends Node {
 			await this.checkDelay(300);
 			await this.checkInterval();
 			await this.checkSetImmediate();
+			await this.checkAfterStall();
 
 			reportTestCompleted();
 		} catch (error) {
@@ -100,6 +121,47 @@ export default class TimerClock extends Node {
 
 		await this.timed(() => new Promise<void>((resolve) => setTimeout(resolve, 100)));
 		check("clearInterval 之后不再触发", count === fired, `清掉后又触发了 ${String(count - fired)} 次`);
+	}
+
+	/**
+	 * 卡顿之后武装的定时器，必须等满自己的延时才响。
+	 * 判据的下界是关键：时钟落后时，这些定时器会在卡顿结束的那一帧当场触发（实测 0ms）。
+	 */
+	private async checkAfterStall(): Promise<void> {
+		// setTimeout：卡顿结束之后再武装
+		busy(STALL_MS);
+		await this.checkDelay(500);
+
+		// 看门狗形状：长延时的定时器同样不能被欠账吃掉
+		busy(STALL_MS);
+		await this.checkDelay(2500);
+
+		// setInterval 的首次延时也要补（后续重排发生在刚推进完时钟之后，本来就不落后）
+		busy(STALL_MS);
+		const first = await this.timed(() => new Promise<void>((resolve) => {
+			const interval = setInterval(() => {
+				clearInterval(interval);
+				resolve();
+			}, 500);
+		}));
+		check(
+			`卡顿 ${String(STALL_MS)}ms 后 setInterval(500ms) 首次触发`,
+			first >= 500 - JIFFIE_SLACK_MS && first <= 500 + LATENESS_BUDGET_MS,
+			`实际 ${String(first)}ms`
+		);
+
+		// 卡顿发生在定时器回调内部，回调里再武装一个：同样不能提前响
+		const armedInside = await this.timed(() => new Promise<void>((resolve) => {
+			setTimeout(() => {
+				busy(STALL_MS);
+				setTimeout(resolve, 500);
+			}, 30);
+		}));
+		check(
+			`回调内卡顿 ${String(STALL_MS)}ms 后再武装 setTimeout(500ms)`,
+			armedInside >= 500 - JIFFIE_SLACK_MS && armedInside <= STALL_MS + 500 + LATENESS_BUDGET_MS,
+			`实际 ${String(armedInside)}ms`
+		);
 	}
 
 	private async checkSetImmediate(): Promise<void> {

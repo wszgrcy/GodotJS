@@ -174,6 +174,18 @@ namespace jsb
 #if JSB_WITH_ESSENTIALS
         JSTimerTags<uint64_t> timer_tags_;
         internal::TTimerManager<JavaScriptTimerAction> timer_manager_;
+
+        // 定时器轮自己不看表，只累加每次喂进来的毫秒数，所以要记住「这个时钟现在对应墙上哪一刻」。
+        // 主线程被占住期间 update() 不跑，那段真实时间就是时钟欠下的账。武装定时器时把它补进
+        // 首次延时（见 timer_clock_pending_msec），否则到期时间是拿一个落后的钟算出来的，
+        // 欠的那段会在下一次推进时被算成「已经等过了」，定时器就提前触发了。
+        bool timer_clock_baselined_ = false;
+        uint64_t timer_wall_base_usec_ = 0;
+
+        /// 两次推进之间不足 1ms 的余量，攒满 1ms 才交给定时器轮。没有它的话，两次推进之间
+        /// 不足 1ms 时（高帧率，或 `--fixed-fps` 关掉帧率节流之后），每次推进量恒为 0，
+        /// 定时器会不报错地永久停摆。
+        uint64_t timer_micro_accum_ = 0;
 #endif
 
         // EnvironmentFlags
@@ -514,7 +526,12 @@ namespace jsb
         static void gc();
         void set_battery_save_mode(bool p_enabled) { isolate_->SetBatterySaverMode(p_enabled); }
 
-        void update(uint64_t p_delta_msecs);
+        /// 推进 JS 定时器时钟并派发到期回调。时钟走的是墙上时钟（OS::get_ticks_usec），
+        /// 调用方只决定「什么时候推进一次」，不再负责算这一帧过了多久。
+        void update();
+
+        /// 已经流逝、但还没喂进定时器轮的时间（毫秒）。武装定时器时用它补首次延时。
+        uint64_t timer_clock_pending_msec() const;
 
 #if !JSB_WITH_WEB
         // [thread safe] it's OK to call this method before the env is initialized.

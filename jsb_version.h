@@ -5,6 +5,6 @@
 
 #define JSB_MAJOR_VERSION 1
 #define JSB_MINOR_VERSION 3
-#define JSB_PATCH_VERSION 7
+#define JSB_PATCH_VERSION 8
 
 #endif

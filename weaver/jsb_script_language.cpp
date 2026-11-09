@@ -137,26 +137,8 @@ void GodotJSScriptLanguage::finish()
 
 void GodotJSScriptLanguage::frame()
 {
-    const uint64_t base_ticks = Engine::get_singleton()->get_frame_ticks();
-
-    uint64_t elapsed_micro = 0;
-
-    if (!timer_clock_baselined_)
-    {
-        timer_clock_baselined_ = true;
-        last_ticks_ = base_ticks;
-    }
-    else
-    {
-        elapsed_micro = base_ticks > last_ticks_ ? base_ticks - last_ticks_ : 0;
-        last_ticks_ = base_ticks;
-    }
-
-    timer_micro_accum_ += elapsed_micro;
-    const uint64_t elapsed_milli = timer_micro_accum_ / 1000ULL;
-    timer_micro_accum_ %= 1000ULL;
-
-    environment_->update(elapsed_milli);
+    // 定时器时钟由 Environment 自己按墙上时钟推进，这里只负责每帧推一次。
+    environment_->update();
 
 #if JSB_DEBUG
     {

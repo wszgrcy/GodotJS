@@ -94,7 +94,6 @@ namespace jsb
 #if JSB_WITH_WEB
         pthread_t pthread_id_ = 0;
         v8::Global<v8::Object> context_obj_handle_;
-        uint64_t web_last_ticks_ = 0;
 
         SpinLock transfers_lock_;
         HashMap<uint32_t, std::vector<TransferData>> transfers_;
@@ -287,7 +286,7 @@ namespace jsb
                 return false;
             }
 
-            _update_environment(env, OS::get_singleton(), web_last_ticks_);
+            env->update();
             emscripten_current_thread_process_queued_calls();
 
             if (interrupt_requested_.is_set())
@@ -352,14 +351,6 @@ namespace jsb
         }
 #endif
 
-        static void _update_environment(const std::shared_ptr<Environment>& p_env, const OS* p_os, uint64_t& p_last_ticks)
-        {
-            const uint64_t ticks = p_os->get_ticks_msec();
-            const uint64_t delta = ticks - p_last_ticks;
-            p_env->update(delta);
-            p_last_ticks = ticks;
-        }
-
         void _shutdown_environment(v8::Global<v8::Object>* p_local_context_obj_handle)
         {
 #if JSB_WITH_WEB
@@ -387,7 +378,6 @@ namespace jsb
             impl->pthread_id_ = pthread_self();
 #else
             const OS* os = OS::get_singleton();
-            uint64_t last_ticks = os->get_ticks_msec();
 #endif
 
             jsb_check(!impl->env_);
@@ -457,20 +447,12 @@ namespace jsb
                     impl->_on_ready();
 
 #if JSB_WITH_WEB
-                    if (const OS* os = OS::get_singleton())
-                    {
-                        impl->web_last_ticks_ = os->get_ticks_msec();
-                    }
-                    else
-                    {
-                        impl->web_last_ticks_ = 0;
-                    }
                     emscripten_set_main_loop_arg(&WorkerImpl::_web_loop_tick, impl, 0, true);
 #else
                     while (!impl->interrupt_requested_.is_set())
                     {
                         impl->_dispatch_inbox(env, context_obj_handle);
-                        WorkerImpl::_update_environment(env, os, last_ticks);
+                        env->update();
                         os->delay_usec(10 * 1000);
                     }
 #endif

@@ -95,12 +95,6 @@ private:
     SelfList<GodotJSScript>::List script_list_;
 
     bool once_inited_ = false;
-    uint64_t last_ticks_ = 0;
-    bool timer_clock_baselined_ = false;
-    /// 不足 1ms 的帧间余量，攒满 1ms 才交给定时器轮。
-    /// 没有它的话，一帧的墙上时间不足 1ms 时（高帧率，或 `--fixed-fps` 关掉帧率节流之后），
-    /// 每帧交给定时器轮的增量恒为 0，定时器会不报错地永久停摆。
-    uint64_t timer_micro_accum_ = 0;
     std::shared_ptr<jsb::Environment> environment_;
 
     Mutex shadow_mutex_;

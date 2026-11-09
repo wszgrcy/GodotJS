@@ -539,10 +539,25 @@ namespace jsb
         EnvironmentStore::get_shared().remove(this);
     }
 
-    void Environment::update(uint64_t p_delta_msecs)
+    void Environment::update()
     {
 #if JSB_WITH_ESSENTIALS
-        const bool timers_ready = timer_manager_.tick(p_delta_msecs);
+        const uint64_t now_usec = OS::get_singleton()->get_ticks_usec();
+        if (!timer_clock_baselined_)
+        {
+            timer_clock_baselined_ = true;
+            timer_wall_base_usec_ = now_usec;
+        }
+
+        // 时间回退按 0 处理，避免无符号相减绕回巨大值
+        const uint64_t elapsed_micro = now_usec > timer_wall_base_usec_ ? now_usec - timer_wall_base_usec_ : 0;
+        timer_wall_base_usec_ = now_usec;
+
+        timer_micro_accum_ += elapsed_micro;
+        const uint64_t elapsed_msecs = timer_micro_accum_ / 1000ULL;
+        timer_micro_accum_ %= 1000ULL;
+
+        const bool timers_ready = timer_manager_.tick(elapsed_msecs);
         if (timers_ready)
         {
             v8::Isolate::Scope isolate_scope(isolate_);
@@ -598,6 +613,21 @@ namespace jsb
         debugger_.update();
 #endif
         variant_allocator_.drain();
+    }
+
+    uint64_t Environment::timer_clock_pending_msec() const
+    {
+#if JSB_WITH_ESSENTIALS
+        if (!timer_clock_baselined_)
+        {
+            return 0;
+        }
+        const uint64_t now_usec = OS::get_singleton()->get_ticks_usec();
+        const uint64_t elapsed_micro = now_usec > timer_wall_base_usec_ ? now_usec - timer_wall_base_usec_ : 0;
+        return (elapsed_micro + timer_micro_accum_) / 1000ULL;
+#else
+        return 0;
+#endif
     }
 
     // handle async calls (from InstanceBindingCallbacks)
