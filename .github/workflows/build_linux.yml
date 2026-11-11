@@ -34,8 +34,11 @@ env:
 
 jobs:
   build-linux:
-    # Stay one LTS before latest to increase portability of Linux artifacts.
-    runs-on: ubuntu-22.04
+    # V8 15 的静态库是用 GCC 13 的标准库编的（它用到 std::atomic_ref 这些 GCC 12+ 才有的东西），
+    # 产物里引用了 std::ios_base_library_init()，这个符号只在 GLIBCXX_3.4.32（GCC 13）起提供。
+    # ubuntu-22.04 的 libstdc++ 只到 3.4.30，链接时缺这个符号，所以跟到 24.04。
+    # 代价：成品的 glibc 下限从 2.35 抬到 2.39。
+    runs-on: ubuntu-24.04
     name: Linux (${{ matrix.target }}, ${{ matrix.engine }})
     timeout-minutes: 120
     strategy:
@@ -75,7 +78,9 @@ jobs:
       - name: Restore Godot build cache
         uses: ./.github/actions/godot-cache-restore
         with:
-          cache-name: linux-${{ matrix.target }}-${{inputs.version}}-${{ matrix.engine }}
+          # 缓存 key 里不带编译器信息，换 runner 镜像后旧 GCC 11 的 .o 会被恢复回来继续用，
+          # 所以把镜像版本写进 cache-name 强制重建
+          cache-name: linux-u24-${{ matrix.target }}-${{inputs.version}}-${{ matrix.engine }}
         continue-on-error: true
 
       - name: Download scripts/out
@@ -159,7 +164,7 @@ jobs:
       - name: Save Godot build cache
         uses: ./.github/actions/godot-cache-save
         with:
-          cache-name: linux-${{ matrix.target }}-${{inputs.version}}-${{ matrix.engine }}
+          cache-name: linux-u24-${{ matrix.target }}-${{inputs.version}}-${{ matrix.engine }}
         continue-on-error: true
 
       - name: Prepare artifact
@@ -199,7 +204,8 @@ jobs:
   #   JS runtime under test.
   build-linux-asan:
     name: Linux (ASan, v8)
-    runs-on: ubuntu-22.04
+    # 与 build-linux 保持一致，理由见那里的 runs-on 说明
+    runs-on: ubuntu-24.04
     timeout-minutes: 120
     steps:
       - name: Checkout Godot

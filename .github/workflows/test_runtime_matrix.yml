@@ -12,7 +12,8 @@ jobs:
       fail-fast: false
       matrix:
         runtime: [host-v8, host-qjs, host-jsc, web-browser, web-qjs]
-    runs-on: ${{ matrix.runtime == 'host-jsc' && 'macos-latest' || 'ubuntu-22.04' }}
+    # 跟 build_linux.yml 的镜像保持一致：产物是在那个镜像上编的，glibc 低于它跑不起来
+    runs-on: ${{ matrix.runtime == 'host-jsc' && 'macos-latest' || 'ubuntu-24.04' }}
     name: Runtime (${{ matrix.runtime }})
     steps:
       - name: ⏬ Checkout repository
