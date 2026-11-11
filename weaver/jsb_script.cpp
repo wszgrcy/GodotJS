@@ -561,7 +561,9 @@ void GodotJSScript::load_module_immediately()
             {
                 RBSet<Object *>::Element *N = E->next();
                 Object* obj = E->get();
-                jsb_check(obj->get_script() == Ref(this));
+                // 两边都写成 Variant：C++20 会把 Ref::operator== 也列为候选（反向候选），
+                // 让 Variant == Ref 变成二义。GCC 11 在这里会直接编不过。
+                jsb_check(obj->get_script() == Variant(this));
                 jsb_check(env->verify_object(obj));
 
                 if (ClassDB::is_parent_class(env->get_script_class(module->script_class_id)->native_class_name, obj->get_class_name()))

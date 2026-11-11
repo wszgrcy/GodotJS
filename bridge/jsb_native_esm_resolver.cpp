@@ -332,9 +332,10 @@ namespace jsb
         v8::Local<v8::FixedArray> /*p_import_attributes*/,
         v8::Local<v8::Module> p_referrer)
     {
-        // V8 15 不再让 Context 反查 isolate，而这里的 isolate 本来就能从 Environment 拿到
+        // V8 15 起 Context 不再提供 GetIsolate()，官方给的替代就是 Isolate::GetCurrent()
+        // （V8 14.1 的 V8_DEPRECATED 文案里写明它保证返回同一个 isolate）
+        v8::Isolate* isolate = v8::Isolate::GetCurrent();
         Environment* env = Environment::wrap(p_context);
-        v8::Isolate* isolate = env->get_isolate();
         const String specifier = impl::Helper::to_string(isolate, p_specifier);
         const String parent_id = env->find_esm_module_id_by_script_id(p_referrer->ScriptId());
 
@@ -426,9 +427,9 @@ namespace jsb
         v8::Local<v8::String> p_specifier,
         v8::Local<v8::FixedArray> /*p_import_attributes*/)
     {
-        // V8 15 不再让 Context 反查 isolate，而这里的 isolate 本来就能从 Environment 拿到
+        // V8 15 起 Context 不再提供 GetIsolate()，官方给的替代就是 Isolate::GetCurrent()
+        v8::Isolate* isolate = v8::Isolate::GetCurrent();
         Environment* env = Environment::wrap(p_context);
-        v8::Isolate* isolate = env->get_isolate();
         const String specifier = impl::Helper::to_string(isolate, p_specifier);
 
         // 发起方的 ScriptOrigin 里存的就是它的资源路径，相对路径按它算
@@ -472,9 +473,9 @@ namespace jsb
         v8::Local<v8::Module> p_module,
         v8::Local<v8::Object> p_meta)
     {
-        // V8 15 不再让 Context 反查 isolate，而这里的 isolate 本来就能从 Environment 拿到
+        // V8 15 起 Context 不再提供 GetIsolate()，官方给的替代就是 Isolate::GetCurrent()
+        v8::Isolate* isolate = v8::Isolate::GetCurrent();
         Environment* env = Environment::wrap(p_context);
-        v8::Isolate* isolate = env->get_isolate();
         const StringName module_id = env->find_esm_module_id_by_script_id(p_module->ScriptId());
         if (module_id == StringName())
         {
