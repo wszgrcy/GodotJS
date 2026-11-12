@@ -43,7 +43,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        engine: [v8, qjs-ng]
+        engine: [v8]
         target: ${{ inputs.release && fromJSON('["editor","template_release","template_debug"]') || fromJSON('["editor"]') }}
     steps:
       - name: Checkout Godot
@@ -143,7 +143,6 @@ jobs:
           scons-flags: >-
             ${{ env.SCONS_FLAGS }}
             ${{ matrix.target == 'editor' && 'vsproj=yes vsproj_gen_only=no' || '' }}
-            ${{ matrix.engine == 'qjs-ng' && 'use_quickjs_ng=yes' || '' }}
             ${{ !inputs.release && matrix.target == 'editor' && 'tests=yes' || '' }}
           platform: windows
           target: ${{ matrix.target }}

@@ -32,12 +32,12 @@ See [Breaking Changes](https://godotjs.github.io/misc/breaking-changes/) if upgr
 ## Features
 
 - [x] Godot ScriptLanguage integration
-- [x] Debug with Chrome/VSCode (with v8) and Safari (with JavaScriptCore)
+- [x] Debug with Chrome/VSCode (with v8)
 - [x] REPL in Editor
 - [x] Hot-reloading
-- [x] Support for multiple javascript engines ([v8](https://github.com/v8/v8), [quickjs](https://github.com/bellard/quickjs), [quickjs-ng](https://github.com/quickjs-ng/quickjs), [JavaScriptCore](https://developer.apple.com/documentation/javascriptcore), the host Browser JS)
+- [x] Support for multiple javascript engines ([v8](https://github.com/v8/v8), the host Browser JS)
 - [x] [Worker threads](https://godotjs.github.io/documentation/experimental/worker/) (limited support) (**experimental**)
-- [x] Asynchronously loaded modules (limited support) (_temporarily only available in v8.impl, quickjs.impl_)
+- [x] Asynchronously loaded modules (limited support) (_temporarily only available in v8.impl_)
 
 ## Examples
 

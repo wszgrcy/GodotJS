@@ -22,7 +22,6 @@
 // Enable the debugger bridge.
 // For v8, use Chrome devtools with the following link by default:
 //      devtools://devtools/bundled/inspector.html?experiments=true&v8only=true&ws=127.0.0.1:9229/1
-// For JavaScriptCore, use Safari.
 #define JSB_WITH_DEBUGGER JSB_DEBUG
 
 // lower log levels are completely skipped (at compile-time)
@@ -63,13 +62,13 @@
 #define JSB_SUPPORT_RELOAD 1
 
 // EXPERIMENTAL, LIMITED SUPPORT
-// only implemented in v8.impl, jsc.impl and quickjs.impl, temporarily.
+// only implemented in v8.impl, temporarily.
 // ---
 //
 // module 'godot-jsb':
 //    - set_async_module_loader
 //    - $import
-#define JSB_SUPPORT_ASYNC_MODULE_LOADER JSB_WITH_V8 || JSB_WITH_QUICKJS || JSB_WITH_JAVASCRIPTCORE
+#define JSB_SUPPORT_ASYNC_MODULE_LOADER JSB_WITH_V8
 
 // translate the js source stacktrace with source map (currently, the `.map` file must locate at the same filename & directory of the js source)
 #define JSB_WITH_SOURCEMAP 1
@@ -85,9 +84,6 @@
 
 // utf16 conversion may have less overhead, but uses more memory?
 #define JSB_UTF16_CONV_PREFERRED 1
-
-// quickjs.impl only, all Object(JSValue) must be explicitly free-ed on the Isolate disposing
-#define JSB_STRICT_DISPOSE 1
 
 // use bigint if a value can not represented as Integer(Number)
 #define JSB_WITH_BIGINT 1

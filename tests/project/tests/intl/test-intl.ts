@@ -34,7 +34,7 @@ function attempt(label: string, fn: () => string) {
  * 而 Date.prototype.toLocaleDateString 会被 V8 当成内存耗尽，直接终止整个进程。
  * 所以这组用例既验"功能能用"，也顺带验数据文件真的跟着引擎一起装好了。
  *
- * 运行时没有 Intl（例如 quickjs）时整组跳过：这些断言只对编进 ICU 的 V8 有意义。
+ * 运行时没有 Intl 时整组跳过：这些断言只对编进 ICU 的 V8 有意义。
  */
 export default class TestIntl extends Node {
     _ready() {

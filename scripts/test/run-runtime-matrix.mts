@@ -50,9 +50,9 @@ const webBootstrapFailurePatterns = [
 ];
 
 const runtimeAliasMap = new Map<string, string[]>([
-    ["all", ["host-v8", "host-qjs", "host-jsc", "web-browser", "web-qjs"]],
-    ["host", ["host-v8", "host-qjs", "host-jsc"]],
-    ["web", ["web-browser", "web-qjs"]],
+    ["all", ["host-v8", "web-browser"]],
+    ["host", ["host-v8"]],
+    ["web", ["web-browser"]],
 ]);
 const selectableRuntimeNames = new Set<string>(runtimeAliasMap.get("all"));
 
@@ -210,7 +210,7 @@ function hostBinaryPredicate(filePath: string) {
 }
 
 function expectedWebTemplateNameForRuntime(runtimeName: string) {
-    const suffix = runtimeName === "qjs" ? "web-qjs" : "web-browser";
+    const suffix = "web-browser";
     return `godot.web.template_debug.wasm32.dlink.${suffix}.zip`;
 }
 
@@ -891,12 +891,6 @@ function buildHostRuntime(runtimeName: string) {
         ...hostVulkanArgs,
     ];
 
-    if (runtimeName === "qjs") {
-        args.push("use_quickjs_ng=yes");
-    } else if (runtimeName === "jsc") {
-        args.push("use_jsc=yes");
-    }
-
     try {
         runCommand(`build host ${runtimeName}`, "scons", args, {cwd: godotRoot});
     } catch (e) {
@@ -925,7 +919,7 @@ function buildHostRuntime(runtimeName: string) {
 
 function buildWebRuntime(runtimeName: string) {
     const targetName = `godot-web-${runtimeName}-template_debug.zip`;
-    const webBuildSuffix = runtimeName === "qjs" ? "web-qjs" : "web-browser";
+    const webBuildSuffix = "web-browser";
     const expectedTemplatePath = join(godotBinDir, expectedWebTemplateNameForRuntime(runtimeName));
 
     if (skipBuilds) {
@@ -949,10 +943,6 @@ function buildWebRuntime(runtimeName: string) {
         ...hostVulkanArgs,
     ];
 
-    if (runtimeName === "qjs") {
-        args.push("use_quickjs_ng=yes");
-    }
-
     runCommand(`build web ${runtimeName}`, "scons", args, { cwd: godotRoot });
 
     if (!existsSync(expectedTemplatePath)) {
@@ -967,33 +957,17 @@ async function main(): Promise<void> {
     const results: TestResult[] = [];
 
     const needsWebBrowser = isRuntimeSelected("web-browser");
-    const needsWebQjs = isRuntimeSelected("web-qjs");
-    const needsAnyWeb = needsWebBrowser || needsWebQjs;
+    const needsAnyWeb = needsWebBrowser;
     const needsHostV8 = isRuntimeSelected("host-v8") || needsAnyWeb;
-    const needsHostQjs = isRuntimeSelected("host-qjs");
-    const needsHostJscRequested = isRuntimeSelected("host-jsc");
-    const needsHostJsc = needsHostJscRequested && isMac;
-
-    if (needsHostJscRequested && !isMac) {
-        throw new Error("host-jsc runtime is only available on macOS");
-    }
 
     runCommand("build tests/project TS", "pnpm", ["-C", projectPath, "build"], { cwd: moduleRoot });
 
     const hostV8Binary = needsHostV8 ? buildHostRuntime("v8") : null;
-    const hostQjsBinary = needsHostQjs ? buildHostRuntime("qjs") : null;
-    const hostJscBinary = needsHostJsc ? buildHostRuntime("jsc") : null;
     const webBrowserTemplate = needsWebBrowser ? buildWebRuntime("browser") : null;
-    const webQjsTemplate = needsWebQjs ? buildWebRuntime("qjs") : null;
 
     const hostRuns = [
         ...(isRuntimeSelected("host-v8") && hostV8Binary ? [{ runtime: "host-v8", binary: hostV8Binary }] : []),
-        ...(isRuntimeSelected("host-qjs") && hostQjsBinary ? [{ runtime: "host-qjs", binary: hostQjsBinary }] : []),
     ];
-
-    if (isRuntimeSelected("host-jsc") && hostJscBinary) {
-        hostRuns.push({ runtime: "host-jsc", binary: hostJscBinary });
-    }
 
     for (const run of hostRuns) {
         try {
@@ -1006,7 +980,6 @@ async function main(): Promise<void> {
 
     const webRuns = [
         ...(isRuntimeSelected("web-browser") && webBrowserTemplate ? [{ runtime: "web-browser", template: webBrowserTemplate }] : []),
-        ...(isRuntimeSelected("web-qjs") && webQjsTemplate ? [{ runtime: "web-qjs", template: webQjsTemplate }] : []),
     ];
 
     for (const run of webRuns) {

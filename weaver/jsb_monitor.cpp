@@ -37,8 +37,6 @@ GodotJSMonitor::GodotJSMonitor()
     JSB_NEW_MONITOR(allocated_variants);
 #if JSB_WITH_V8
     JSB_NEW_MONITOR(heap_size);
-#elif JSB_WITH_QUICKJS
-    JSB_NEW_MONITOR(memory_used_size);
 #endif
 }
 
@@ -52,8 +50,6 @@ void GodotJSMonitor::_bind_methods()
     JSB_BIND_MONITOR(allocated_variants);
 #if JSB_WITH_V8
     JSB_BIND_MONITOR(heap_size);
-#elif JSB_WITH_QUICKJS
-    JSB_BIND_MONITOR(memory_used_size);
 #endif
 }
 
@@ -66,8 +62,6 @@ JSB_DEFINE_MONITOR(allocated_variants);
 
 #if JSB_WITH_V8
     JSB_DEFINE_CUSTOM_MONITOR(heap_size, u.u64_cap[0]);
-#elif JSB_WITH_QUICKJS
-    JSB_DEFINE_CUSTOM_MONITOR(memory_used_size, u.i64);
 #endif
 
 GodotJSMonitor::~GodotJSMonitor()

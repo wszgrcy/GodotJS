@@ -28,8 +28,6 @@ protected:
 
 #if JSB_WITH_V8
     JSB_DECLARE_MONITOR(heap_size);
-#elif JSB_WITH_QUICKJS
-    JSB_DECLARE_MONITOR(memory_used_size);
 #endif
 
 public:

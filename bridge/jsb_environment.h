@@ -747,8 +747,8 @@ namespace jsb
             // because of an assumption that the deleter is never called if a JS runtime is already released (~Environment)
             Environment* env = (Environment*) deleter_data;
 
-            // valuetype deleter is run in a background thread in v8.impl and jsc.impl
-#if JSB_WITH_V8 || JSB_WITH_JAVASCRIPTCORE
+            // valuetype deleter is run in a background thread in v8.impl
+#if JSB_WITH_V8
             // `Callable/Array/Dictionary` may contain reference-based objects.
             // executing the destructor of a reference-based object may cause crash (not thread-safe),
             // release them in main thread for simplicity.

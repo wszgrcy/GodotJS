@@ -1306,25 +1306,8 @@ namespace jsb
     namespace
     {
 
-#if JSB_WITH_QUICKJS
-        jsb_force_inline void* quickjs_object_identity(const v8::Local<v8::Object>& obj)
-        {
-            const JSValue value = (JSValue) obj;
-            return JS_VALUE_GET_TAG(value) < 0 ? JS_VALUE_GET_PTR(value) : nullptr;
-        }
-#endif
-
         struct VisitedEntry
         {
-#if JSB_WITH_QUICKJS
-            void* original_identity;
-            v8::Global<v8::Value> replacement;
-
-            VisitedEntry(v8::Isolate* isolate, const v8::Local<v8::Object>& original, const v8::Local<v8::Value>& replacement_value)
-                : original_identity(quickjs_object_identity(original)), replacement(isolate, replacement_value)
-            {
-            }
-#else
             v8::Global<v8::Object> original;
             v8::Global<v8::Value> replacement;
 
@@ -1332,26 +1315,16 @@ namespace jsb
                 : original(isolate, original), replacement(isolate, replacement_value)
             {
             }
-#endif
         };
 
         jsb_force_inline bool visited_matches(v8::Isolate* isolate, const VisitedEntry& entry, const v8::Local<v8::Object>& obj)
         {
-#if JSB_WITH_QUICKJS
-            jsb_unused(isolate);
-            return entry.original_identity == quickjs_object_identity(obj);
-#else
             return entry.original.Get(isolate) == obj;
-#endif
         }
 
         jsb_force_inline v8::Local<v8::Value> visited_replacement(v8::Isolate* isolate, const VisitedEntry& entry)
         {
-#if JSB_WITH_QUICKJS
             return entry.replacement.Get(isolate);
-#else
-            return entry.replacement.Get(isolate);
-#endif
         }
 
         jsb_force_inline bool is_array_buffer_object(const v8::Local<v8::Object>& obj)

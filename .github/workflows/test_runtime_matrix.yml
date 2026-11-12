@@ -11,9 +11,9 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        runtime: [host-v8, host-qjs, host-jsc, web-browser, web-qjs]
+        runtime: [host-v8, web-browser]
     # 跟 build_linux.yml 的镜像保持一致：产物是在那个镜像上编的，glibc 低于它跑不起来
-    runs-on: ${{ matrix.runtime == 'host-jsc' && 'macos-latest' || 'ubuntu-24.04' }}
+    runs-on: ubuntu-24.04
     name: Runtime (${{ matrix.runtime }})
     steps:
       - name: ⏬ Checkout repository
@@ -28,25 +28,11 @@ jobs:
         shell: bash
 
       - name: ⏬ Download host-v8 artifact
-        if: matrix.runtime == 'host-v8' || matrix.runtime == 'web-browser' || matrix.runtime == 'web-qjs'
+        if: matrix.runtime == 'host-v8' || matrix.runtime == 'web-browser'
         uses: actions/download-artifact@v8
         with:
           name: linux-editor-${{ inputs.version }}-v8
           path: runtime-artifacts/host-v8
-
-      - name: ⏬ Download host-qjs artifact
-        if: matrix.runtime == 'host-qjs'
-        uses: actions/download-artifact@v8
-        with:
-          name: linux-editor-${{ inputs.version }}-qjs-ng
-          path: runtime-artifacts/host-qjs
-
-      - name: ⏬ Download host-jsc artifact
-        if: matrix.runtime == 'host-jsc'
-        uses: actions/download-artifact@v8
-        with:
-          name: macos-editor-${{ inputs.version }}-jsc
-          path: runtime-artifacts/host-jsc
 
       - name: ⏬ Download web-browser template artifact
         if: matrix.runtime == 'web-browser'
@@ -54,13 +40,6 @@ jobs:
         with:
           name: web-template_debug-${{ inputs.version }}-browser
           path: runtime-artifacts/web-browser
-
-      - name: ⏬ Download web-qjs template artifact
-        if: matrix.runtime == 'web-qjs'
-        uses: actions/download-artifact@v8
-        with:
-          name: web-template_debug-${{ inputs.version }}-qjs-ng
-          path: runtime-artifacts/web-qjs
 
       - name: 📦 Stage runtime assets for run-runtime-matrix
         shell: bash
@@ -101,29 +80,11 @@ jobs:
               chmod +x tests/bin/godot-host-v8
               stage_icu_data runtime-artifacts/host-v8
               ;;
-            host-qjs)
-              src="$(pick_one runtime-artifacts/host-qjs 'godot.linuxbsd.editor.*')" || fail_missing "host-qjs binary"
-              cp "$src" tests/bin/godot-host-qjs
-              chmod +x tests/bin/godot-host-qjs
-              ;;
-            host-jsc)
-              src="$(pick_one runtime-artifacts/host-jsc 'godot.macos.editor.*')" || fail_missing "host-jsc binary"
-              cp "$src" tests/bin/godot-host-jsc
-              chmod +x tests/bin/godot-host-jsc
-              ;;
             web-browser)
               host_src="$(pick_one runtime-artifacts/host-v8 'godot.linuxbsd.editor.*')" || fail_missing "web-browser host-v8 binary"
               web_src="$(pick_one runtime-artifacts/web-browser '*.zip')" || fail_missing "web-browser template zip"
               cp "$host_src" tests/bin/godot-host-v8
               cp "$web_src" tests/bin/godot-web-browser-template_debug.zip
-              chmod +x tests/bin/godot-host-v8
-              stage_icu_data runtime-artifacts/host-v8
-              ;;
-            web-qjs)
-              host_src="$(pick_one runtime-artifacts/host-v8 'godot.linuxbsd.editor.*')" || fail_missing "web-qjs host-v8 binary"
-              web_src="$(pick_one runtime-artifacts/web-qjs '*.zip')" || fail_missing "web-qjs template zip"
-              cp "$host_src" tests/bin/godot-host-v8
-              cp "$web_src" tests/bin/godot-web-qjs-template_debug.zip
               chmod +x tests/bin/godot-host-v8
               stage_icu_data runtime-artifacts/host-v8
               ;;
@@ -140,8 +101,6 @@ jobs:
         run: |
           set -euo pipefail
           case "${{ matrix.runtime }}" in
-            host-v8|web-browser|web-qjs) GODOT_BIN="${GITHUB_WORKSPACE}/tests/bin/godot-host-v8" ;;
-            host-qjs) GODOT_BIN="${GITHUB_WORKSPACE}/tests/bin/godot-host-qjs" ;;
-            host-jsc) GODOT_BIN="${GITHUB_WORKSPACE}/tests/bin/godot-host-jsc" ;;
+            host-v8|web-browser) GODOT_BIN="${GITHUB_WORKSPACE}/tests/bin/godot-host-v8" ;;
           esac
           GODOT="$GODOT_BIN" pnpm test -- --runtimes ${{ matrix.runtime }} --skip-builds

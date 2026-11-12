@@ -39,15 +39,6 @@
 #   define jsb_checkf(Condition, Format, ...) (void) 0
 #endif
 
-// only check if compiling with QuickJS impl
-#if JSB_WITH_QUICKJS
-#   define jsb_quickjs_check(Condition) jsb_check(Condition)
-#   define jsb_quickjs_checkf(Condition, Format, ...) jsb_checkf(Condition, Format, ...)
-#else
-#   define jsb_quickjs_check(Condition) (void) 0
-#   define jsb_quickjs_checkf(Condition, Format, ...) (void) 0
-#endif
-
 // only check if compiling with v8 impl
 #if JSB_WITH_V8
 #   define jsb_v8_check(Condition) jsb_check(Condition)

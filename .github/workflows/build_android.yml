@@ -39,7 +39,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        engine: [ v8, qjs-ng ]
+        engine: [ v8 ]
         target: ${{ inputs.release && fromJSON('["template_release","template_debug"]') || fromJSON('["template_debug"]') }}
     steps:
       - name: Checkout Godot
@@ -93,7 +93,6 @@ jobs:
         with:
           scons-flags: >-
             ${{ env.SCONS_FLAGS }}
-            ${{ matrix.engine == 'qjs-ng' && 'use_quickjs_ng=yes' || '' }}
           platform: android
           target: ${{ matrix.target }}
 

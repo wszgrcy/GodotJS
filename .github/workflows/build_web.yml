@@ -36,7 +36,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        engine: [ browser, qjs-ng ]
+        engine: [ browser ]
         target: ${{ inputs.release && fromJSON('["template_release","template_debug"]') || fromJSON('["template_debug"]') }}
         threads: ${{ inputs.release && fromJSON('["yes","no"]') || fromJSON('["yes"]') }}
         dlink: ${{ inputs.release && fromJSON('["yes","no"]') || fromJSON('["no"]') }}
@@ -105,7 +105,6 @@ jobs:
         with:
           scons-flags: >-
             ${{ env.SCONS_FLAGS }}
-            ${{ matrix.engine == 'qjs-ng' && 'use_quickjs_ng=yes' || '' }}
           platform: web
           target: ${{ matrix.target }}
 

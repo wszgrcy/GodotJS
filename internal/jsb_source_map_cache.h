@@ -23,8 +23,6 @@ namespace jsb::internal
             String function;
             String filename;
             int line = 0;
-
-            // not available in quickjs.impl
             int col = 0;
         };
 

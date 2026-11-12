@@ -36,7 +36,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        engine: [v8, qjs-ng, jsc]
+        engine: [v8]
         target: ${{ inputs.release && fromJSON('["editor","template_release","template_debug"]') || fromJSON('["editor"]') }}
     steps:
       # From https://github.com/actions/runner-images/blob/main/images/macos
@@ -144,8 +144,6 @@ jobs:
           scons-flags: >-
             ${{ env.SCONS_FLAGS }}
             ${{ matrix.target != 'editor' && 'debug_symbols=no' || '' }}
-            ${{ matrix.engine == 'qjs-ng' && 'use_quickjs_ng=yes' || '' }}
-            ${{ matrix.engine == 'jsc' && 'use_jsc=yes' || '' }}
             arch=x86_64
             vulkan=${{ steps.vulkan-sdk.outputs.VULKAN_ENABLED }}
             angle=${{ steps.angle-sdk.outputs.ANGLE_ENABLED }}
@@ -159,8 +157,6 @@ jobs:
           scons-flags: >-
             ${{ env.SCONS_FLAGS }}
             ${{ matrix.target != 'editor' && 'debug_symbols=no' || '' }}
-            ${{ matrix.engine == 'qjs-ng' && 'use_quickjs_ng=yes' || '' }}
-            ${{ matrix.engine == 'jsc' && 'use_jsc=yes' || '' }}
             arch=arm64
             vulkan=${{ steps.vulkan-sdk.outputs.VULKAN_ENABLED }}
             angle=${{ steps.angle-sdk.outputs.ANGLE_ENABLED }}
@@ -230,7 +226,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        engine: [v8, qjs-ng, jsc]
+        engine: [v8]
     steps:
       - name: Checkout Godot
         uses: actions/checkout@v6

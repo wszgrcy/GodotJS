@@ -41,9 +41,6 @@ if False:
     env.AppendUnique(CPPDEFINES=["_ITERATOR_DEBUG_LEVEL=0"]) 
     env.Append(CPPPATH=[f"lws/windows_x86_64_release/include"])
     env.Append(LIBS=[File("lws/windows_x86_64_release/websockets.lib")])
-else:
-    # quickjs
-    source = source + Glob("src/impl/quickjs/*.c") 
 
 if env["target"] in ["editor", "template_debug"]:
     try:

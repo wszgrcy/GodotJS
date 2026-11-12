@@ -403,7 +403,6 @@ namespace jsb
             {
                 index = 0;
                 collection = v8::Array::New(isolate);
-                jsb_quickjs_check(collection->IsArray());
                 target->Set(context, symbol, collection).Check();
             }
 
@@ -540,7 +539,6 @@ namespace jsb
             {
                 index = 0;
                 collection = v8::Array::New(isolate);
-                jsb_quickjs_check(collection->IsArray());
                 target->Set(context, symbol, collection).Check();
             }
 

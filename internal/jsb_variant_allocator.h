@@ -17,12 +17,12 @@ namespace jsb::internal
         SafeNumeric<uint32_t> alive_variants_num_;
 #endif
 
-#if JSB_WITH_V8 || JSB_WITH_JAVASCRIPTCORE
-        // v8 and jsc implementation of deleter are probably called from JS gc threads
+#if JSB_WITH_V8
+        // v8 implementation of deleter is probably called from JS gc threads
         // so we need thread-safe version
         PagedAllocator<Variant, true> paged_allocator_;
 #else
-        // web and quickjs implementation of deleter are called from owner thread only
+        // web implementation of deleter is called from owner thread only
         PagedAllocator<Variant, false> paged_allocator_;
 #endif
 

@@ -6,8 +6,8 @@
 // V8 15 asks for a "tag" next to every embedder pointer (internal fields,
 // embedder data, v8::External) and refuses to compile if it is missing. The tag
 // only exists so V8 can check that a pointer is read back with the same meaning
-// it was written with. QuickJS, JavaScriptCore and the web runtime do not have
-// that check, so the code shared with them passes the default tag and the
+// it was written with. The web runtime does not have that check,
+// so the code shared with it passes the default tag and the
 // emulation layer below ignores it.
 
 namespace v8

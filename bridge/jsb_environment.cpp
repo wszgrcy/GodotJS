@@ -607,17 +607,11 @@ namespace jsb
 
         exec_async_calls();
 
-        // quickjs delayed the free op after all HandleScope left, we need to swap the free op list manually explicitly.
-        // otherwise, object may leak until next evacuation of HandleScope.
-#if JSB_WITH_QUICKJS || JSB_WITH_JAVASCRIPTCORE
-        isolate_->PerformMicrotaskCheckpoint();
-#else
         if (flags_ & EF_MicrotaskCheckpoint)
         {
             flags_ &= ~EF_MicrotaskCheckpoint;
             isolate_->PerformMicrotaskCheckpoint();
         }
-#endif
 
 #if JSB_WITH_DEBUGGER
         debugger_.update();
@@ -768,13 +762,9 @@ namespace jsb
                 p_env->transfer_in_apply_state(transfer);
             }
 
-#if JSB_WITH_V8 || JSB_WITH_JAVASCRIPTCORE || JSB_WITH_QUICKJS
             Serialization::VariantDeserializerDelegate delegate(p_env, transfers);
             v8::ValueDeserializer deserializer(isolate, p_message->get_buffer().ptr(), p_message->get_buffer().size(), &delegate);
             delegate.SetSerializer(&deserializer);
-#else
-            v8::ValueDeserializer deserializer(isolate, p_message->get_buffer().ptr(), p_message->get_buffer().size());
-#endif
 
             bool ok;
             if (!deserializer.ReadHeader(p_context).To(&ok) || !ok)
@@ -788,11 +778,6 @@ namespace jsb
                 JSB_LOG(Error, "failed to parse message value");
                 return;
             }
-
-#if !JSB_WITH_V8 && !JSB_WITH_JAVASCRIPTCORE && !JSB_WITH_QUICKJS
-            // Restore Godot bindings from transfer markers.
-            value = Worker::restore_transfer_markers(isolate, p_context, value, transfers);
-#endif
         }
 
         const impl::TryCatch try_catch(isolate);
@@ -1483,12 +1468,6 @@ namespace jsb
         {
             JSB_LOG(Error, "constructed '%s' but did not bind native object %d", js_class_name, (uintptr_t) p_this);
         }
-#if JSB_WITH_JAVASCRIPTCORE
-        else
-        {
-            _rebind(isolate, context, p_this, p_class_id);
-        }
-#endif
         return bound_object_id;
     }
 
