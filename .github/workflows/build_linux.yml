@@ -18,6 +18,10 @@ on:
 
 # Global Settings
 env:
+  # runner 镜像的版本标记，只用来拼缓存名。SCons 判断一个 .o 能不能复用时只看
+  # 源码和编译命令，不看编译器版本；runner 镜像一升级（GCC 换了），旧编译器产的
+  # .o 会被当成有效继续用。把镜像版本写进缓存名，换镜像时改这里，整批缓存自动重建。
+  RUNNER_TAG: u24
   # Ideally we'd use dev_mode=yes. Unfortunately, v8 headers contain warnings. So we manually set some dev_mode options.
   SCONS_FLAGS: >-
     verbose=yes
@@ -69,18 +73,13 @@ jobs:
             sudo apt-get install mesa-vulkan-drivers
           fi
 
-      - name: Free disk space on runner
-        run: |
-          echo "Disk usage before:" && df -h
-          sudo rm -rf /usr/local/lib/android
-          echo "Disk usage after:" && df -h
-
+      # 原本这里是腾磁盘步骤（rm -rf /usr/local/lib/android），实测每个 job 要跑 1.4 分钟。
+      # 普通构建（含恢复的缓存）总共只写 ~4 GB，runner 空间足够；真正吃磁盘的
+      # ASan 构建仍保留该步骤。
       - name: Restore Godot build cache
         uses: ./.github/actions/godot-cache-restore
         with:
-          # 缓存 key 里不带编译器信息，换 runner 镜像后旧 GCC 11 的 .o 会被恢复回来继续用，
-          # 所以把镜像版本写进 cache-name 强制重建
-          cache-name: linux-u24-${{ matrix.target }}-${{inputs.version}}-${{ matrix.engine }}
+          cache-name: linux-${{ env.RUNNER_TAG }}-${{ matrix.target }}-${{inputs.version}}-${{ matrix.engine }}
         continue-on-error: true
 
       - name: Download scripts/out
@@ -164,7 +163,7 @@ jobs:
       - name: Save Godot build cache
         uses: ./.github/actions/godot-cache-save
         with:
-          cache-name: linux-u24-${{ matrix.target }}-${{inputs.version}}-${{ matrix.engine }}
+          cache-name: linux-${{ env.RUNNER_TAG }}-${{ matrix.target }}-${{inputs.version}}-${{ matrix.engine }}
         continue-on-error: true
 
       - name: Prepare artifact
@@ -238,6 +237,15 @@ jobs:
         with:
           make-default: false
 
+      # 这份构建的编译参数（dev_build + use_asan）与普通 editor 构建完全不同，
+      # 产物 .o 不能共用，所以单独一份缓存 key。没有缓存时它每次都要从零编 3000 多个
+      # 文件（实测 31~34 分钟），是整个流水线里最慢的一个 job。
+      - name: Restore Godot build cache
+        uses: ./.github/actions/godot-cache-restore
+        with:
+          cache-name: linux-${{ env.RUNNER_TAG }}-asan-${{inputs.version}}-v8
+        continue-on-error: true
+
       - name: Download scripts/out
         uses: actions/download-artifact@v8
         with:
@@ -260,6 +268,12 @@ jobs:
             debug_symbols=no
           platform: linuxbsd
           target: editor
+
+      - name: Save Godot build cache
+        uses: ./.github/actions/godot-cache-save
+        with:
+          cache-name: linux-${{ env.RUNNER_TAG }}-asan-${{inputs.version}}-v8
+        continue-on-error: true
 
       # The [jsb] test cases need the test project compiled: the helpers check
       # that .godot/GodotJS/test_01.js exists, and that file is produced by
