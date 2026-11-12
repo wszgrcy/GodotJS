@@ -33,16 +33,8 @@ jobs:
         run: |
           pnpm install
 
-      - name: 🆚 Create and publish versions
-        id: changesets
-        uses: changesets/action@v1
-        with:
-          commit: "chore: update versions"
-          title: "chore: update versions"
-          version: pnpm ci:version
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-
+      # 版本号只由人改。CI 在这里只做一件事：拿 package.json 里的版本去比对远端 tag，
+      # 没发过才放行 release。
       - name: ❓ Should publish
         id: should_publish
         run: |
