@@ -137,13 +137,69 @@ jobs:
         if: inputs.version_mm == '4.7'
         run: unzip -o accesskit_c.zip
 
+      # 测试构建：带 tests=yes，C++ 单测就编在这个 editor 里，靠 `--test` 跑。
+      # 不管是不是发版，这一步都一样，缓存只认这一种参数。
       - name: Compilation
         uses: ./.github/actions/godot-build
         with:
           scons-flags: >-
             ${{ env.SCONS_FLAGS }}
             ${{ matrix.target == 'editor' && 'vsproj=yes vsproj_gen_only=no' || '' }}
-            ${{ !inputs.release && matrix.target == 'editor' && 'tests=yes' || '' }}
+            ${{ matrix.target == 'editor' && 'tests=yes' || '' }}
+          platform: windows
+          target: ${{ matrix.target }}
+
+      - name: Setup pnpm
+        if: ${{ matrix.target == 'editor' }}
+        uses: pnpm/action-setup@v6
+        with:
+          version: 10.11.0
+
+      - name: Setup Node.js
+        if: ${{ matrix.target == 'editor' }}
+        uses: actions/setup-node@v5
+        with:
+          node-version: 24
+
+      - name: Build tests/project
+        if: ${{ matrix.target == 'editor' }}
+        shell: pwsh
+        run: |
+          $env:GODOT = "${{ github.workspace }}/bin/godot.windows.editor.x86_64.exe"
+          pnpm -C "${{ github.workspace }}/modules/GodotJS/tests/project" install --ignore-workspace
+          pnpm -C "${{ github.workspace }}/modules/GodotJS/tests/project" build
+
+      - name: Unit tests
+        if: ${{ matrix.target == 'editor' }}
+        shell: pwsh
+        env:
+          # The editor is a GUI-subsystem program now, and a shell does not always
+          # wait for one. The console wrapper is a console program: it forwards the
+          # arguments, waits for the editor to exit and returns its exit code.
+          # Its name comes from PROGSUFFIX_WRAP in SConstruct: ".console" with dots.
+          BIN: ./bin/godot.windows.editor.x86_64.console.exe
+        run: |
+          if (-not (Test-Path "${{ env.BIN }}")) { Write-Error "没有生成 console 包装器：${{ env.BIN }}"; exit 1 }
+          ${{ env.BIN }} --version
+          ${{ env.BIN }} --help
+          $output = & "${{ env.BIN }}" --headless --test --test-case="[jsb]*" --force-colors 2>&1
+          $code = $LASTEXITCODE
+          $output | Write-Output
+          if ($code -ne 0) { Write-Error "单元测试失败，退出码 $code"; exit 1 }
+          # Without a doctest summary in the output the tests never ran; don't let
+          # this step report success in that case.
+          if (-not ($output -match "\[doctest\]")) { Write-Error "测试没有运行：输出里找不到 doctest 汇总"; exit 1 }
+
+      # 上面那份 editor 里有测试代码，不能发出去。发版时测试跑完再按不带测试的
+      # 参数重编一次，上传的是这一份。两次编译共用同一个 .scons_cache，
+      # 命令行相同的文件不会重编。
+      - name: Compilation (release, no tests)
+        if: ${{ inputs.release && matrix.target == 'editor' }}
+        uses: ./.github/actions/godot-build
+        with:
+          scons-flags: >-
+            ${{ env.SCONS_FLAGS }}
+            vsproj=yes vsproj_gen_only=no
           platform: windows
           target: ${{ matrix.target }}
 
@@ -165,49 +221,8 @@ jobs:
           # what official Godot packages do. Match that and save 9 MB.
           Remove-Item bin/D3D12Core.dll,bin/d3d12SDKLayers.dll -Force -ErrorAction SilentlyContinue
 
-      - name: Setup pnpm
-        if: ${{ !inputs.release && matrix.target == 'editor' }}
-        uses: pnpm/action-setup@v6
-        with:
-          version: 10.11.0
-
-      - name: Setup Node.js
-        if: ${{ !inputs.release && matrix.target == 'editor' }}
-        uses: actions/setup-node@v5
-        with:
-          node-version: 24
-
-      - name: Build tests/project
-        if: ${{ !inputs.release && matrix.target == 'editor' }}
-        shell: pwsh
-        run: |
-          $env:GODOT = "${{ github.workspace }}/bin/godot.windows.editor.x86_64.exe"
-          pnpm -C "${{ github.workspace }}/modules/GodotJS/tests/project" install --ignore-workspace
-          pnpm -C "${{ github.workspace }}/modules/GodotJS/tests/project" build
-
       - name: Upload artifact
         uses: ./.github/actions/upload-artifact
         with:
           name: windows-${{ matrix.target }}-${{inputs.version}}-${{ matrix.engine }}
-
-      - name: Unit tests
-        if: ${{ !inputs.release && matrix.target == 'editor' }}
-        shell: pwsh
-        env:
-          # The editor is a GUI-subsystem program now, and a shell does not always
-          # wait for one. The console wrapper is a console program: it forwards the
-          # arguments, waits for the editor to exit and returns its exit code.
-          # Its name comes from PROGSUFFIX_WRAP in SConstruct: ".console" with dots.
-          BIN: ./bin/godot.windows.editor.x86_64.console.exe
-        run: |
-          if (-not (Test-Path "${{ env.BIN }}")) { Write-Error "没有生成 console 包装器：${{ env.BIN }}"; exit 1 }
-          ${{ env.BIN }} --version
-          ${{ env.BIN }} --help
-          $output = & "${{ env.BIN }}" --headless --test --test-case="[jsb]*" --force-colors 2>&1
-          $code = $LASTEXITCODE
-          $output | Write-Output
-          if ($code -ne 0) { Write-Error "单元测试失败，退出码 $code"; exit 1 }
-          # Without a doctest summary in the output the tests never ran; don't let
-          # this step report success in that case.
-          if (-not ($output -match "\[doctest\]")) { Write-Error "测试没有运行：输出里找不到 doctest 汇总"; exit 1 }
 

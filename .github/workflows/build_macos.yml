@@ -138,6 +138,8 @@ jobs:
           name: scripts-out
           path: ${{github.workspace}}/modules/GodotJS/scripts/out
 
+      # 测试构建：带 tests=yes，C++ 单测就编在这个 editor 里，靠 `--test` 跑。
+      # 不管是不是发版，这两步都一样，缓存只认这一种参数。
       - name: Compilation (x86_64)
         uses: ./.github/actions/godot-build
         with:
@@ -147,7 +149,7 @@ jobs:
             arch=x86_64
             vulkan=${{ steps.vulkan-sdk.outputs.VULKAN_ENABLED }}
             angle=${{ steps.angle-sdk.outputs.ANGLE_ENABLED }}
-            ${{ !inputs.release && matrix.target == 'editor' && 'tests=yes' || '' }}
+            ${{ matrix.target == 'editor' && 'tests=yes' || '' }}
           platform: macos
           target: ${{ matrix.target }}
 
@@ -160,7 +162,67 @@ jobs:
             arch=arm64
             vulkan=${{ steps.vulkan-sdk.outputs.VULKAN_ENABLED }}
             angle=${{ steps.angle-sdk.outputs.ANGLE_ENABLED }}
-            ${{ !inputs.release && matrix.target == 'editor' && 'tests=yes' || '' }}
+            ${{ matrix.target == 'editor' && 'tests=yes' || '' }}
+          platform: macos
+          target: ${{ matrix.target }}
+
+      # 测试跟单测跑 arm64 那一份（runner 就是 arm64）。合并成 universal 二进制
+      # 的 Prepare artifact 步骤挪到了最后，要等发布构建编完才做。
+      - name: Setup pnpm
+        if: ${{ matrix.target == 'editor' }}
+        uses: pnpm/action-setup@v6
+        with:
+          version: 10.11.0
+
+      - name: Setup Node.js
+        if: ${{ matrix.target == 'editor' }}
+        uses: actions/setup-node@v5
+        with:
+          node-version: 24
+
+      - name: Build tests/project
+        if: ${{ matrix.target == 'editor' }}
+        shell: bash
+        env:
+          VULKAN_SDK_PATH: ${{ steps.vulkan-sdk.outputs.VULKAN_SDK_PATH }}
+        run: |
+          set -euo pipefail
+          pnpm -C "${{ github.workspace }}/modules/GodotJS/tests/project" install --ignore-workspace
+          GODOT="${{ github.workspace }}/bin/godot.macos.editor.arm64" pnpm -C "${{ github.workspace }}/modules/GodotJS/tests/project" build
+
+      - name: Unit tests
+        if: ${{ matrix.target == 'editor' }}
+        env:
+          BIN: ./bin/godot.macos.editor.arm64
+        run: |
+          ${{ env.BIN }} --version
+          ${{ env.BIN }} --help
+          ${{ env.BIN }} --headless --test --test-case="[jsb]*" --force-colors
+
+      # 上面那份 editor 里有测试代码，不能发出去。发版时测试跑完再按不带测试的
+      # 参数重编一次，上传的是这一份。两次编译共用同一个 .scons_cache，
+      # 命令行相同的文件不会重编。
+      - name: Compilation (x86_64, release, no tests)
+        if: ${{ inputs.release && matrix.target == 'editor' }}
+        uses: ./.github/actions/godot-build
+        with:
+          scons-flags: >-
+            ${{ env.SCONS_FLAGS }}
+            arch=x86_64
+            vulkan=${{ steps.vulkan-sdk.outputs.VULKAN_ENABLED }}
+            angle=${{ steps.angle-sdk.outputs.ANGLE_ENABLED }}
+          platform: macos
+          target: ${{ matrix.target }}
+
+      - name: Compilation (arm64, release, no tests)
+        if: ${{ inputs.release && matrix.target == 'editor' }}
+        uses: ./.github/actions/godot-build
+        with:
+          scons-flags: >-
+            ${{ env.SCONS_FLAGS }}
+            arch=arm64
+            vulkan=${{ steps.vulkan-sdk.outputs.VULKAN_ENABLED }}
+            angle=${{ steps.angle-sdk.outputs.ANGLE_ENABLED }}
           platform: macos
           target: ${{ matrix.target }}
 
@@ -183,41 +245,10 @@ jobs:
           strip bin/godot.*
           chmod +x bin/godot.*
 
-      - name: Setup pnpm
-        if: ${{ !inputs.release && matrix.target == 'editor' }}
-        uses: pnpm/action-setup@v6
-        with:
-          version: 10.11.0
-
-      - name: Setup Node.js
-        if: ${{ !inputs.release && matrix.target == 'editor' }}
-        uses: actions/setup-node@v5
-        with:
-          node-version: 24
-
-      - name: Build tests/project
-        if: ${{ !inputs.release && matrix.target == 'editor' }}
-        shell: bash
-        env:
-          VULKAN_SDK_PATH: ${{ steps.vulkan-sdk.outputs.VULKAN_SDK_PATH }}
-        run: |
-          set -euo pipefail
-          pnpm -C "${{ github.workspace }}/modules/GodotJS/tests/project" install --ignore-workspace
-          GODOT="${{ github.workspace }}/bin/godot.macos.editor.universal" pnpm -C "${{ github.workspace }}/modules/GodotJS/tests/project" build
-
       - name: Upload artifact
         uses: ./.github/actions/upload-artifact
         with:
           name: macos-${{ matrix.target }}-${{inputs.version}}-${{ matrix.engine }}
-
-      - name: Unit tests
-        if: ${{ !inputs.release && matrix.target == 'editor' }}
-        env:
-          BIN: ./bin/godot.macos.editor.universal
-        run: |
-          ${{ env.BIN }} --version
-          ${{ env.BIN }} --help
-          ${{ env.BIN }} --headless --test --test-case="[jsb]*" --force-colors
 
   build-macos-apps:
     needs:

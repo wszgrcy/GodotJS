@@ -69,7 +69,7 @@ jobs:
         run: |
           sudo apt-get update
           sudo apt-get install libwayland-bin # TODO: Figure out somehow how to embed this one.
-          if [ "${{ !inputs.release && matrix.target || '' }}" == "editor" ]; then
+          if [ "${{ matrix.target }}" == "editor" ]; then
             sudo apt-get install mesa-vulkan-drivers
           fi
 
@@ -130,34 +130,57 @@ jobs:
         if: inputs.version_mm == '4.7'
         run: unzip -o accesskit_c.zip
 
+      # 测试构建：带 tests=yes，C++ 单测就编在这个 editor 里，靠 `--test` 跑。
+      # 不管是不是发版，这一步都一样，缓存只认这一种参数。
       - name: Compilation
         uses: ./.github/actions/godot-build
         with:
           scons-flags: >-
             ${{ env.SCONS_FLAGS }}
             ${{ matrix.target != 'editor' && 'debug_symbols=no' || '' }}
-            ${{ !inputs.release && matrix.target == 'editor' && 'tests=yes' || '' }}
+            ${{ matrix.target == 'editor' && 'tests=yes' || '' }}
           platform: linuxbsd
 
       - name: Setup pnpm
-        if: ${{ !inputs.release && matrix.target == 'editor' }}
+        if: ${{ matrix.target == 'editor' }}
         uses: pnpm/action-setup@v6
         with:
           version: 10.11.0
 
       - name: Setup Node.js
-        if: ${{ !inputs.release && matrix.target == 'editor' }}
+        if: ${{ matrix.target == 'editor' }}
         uses: actions/setup-node@v5
         with:
           node-version: 24
 
       - name: Build tests/project
-        if: ${{ !inputs.release && matrix.target == 'editor' }}
+        if: ${{ matrix.target == 'editor' }}
         shell: bash
         run: |
           set -euo pipefail
           pnpm -C "${{ github.workspace }}/modules/GodotJS/tests/project" install --ignore-workspace
           GODOT="${{ github.workspace }}/bin/godot.linuxbsd.editor.x86_64" pnpm -C "${{ github.workspace }}/modules/GodotJS/tests/project" build
+
+      - name: Unit tests
+        if: ${{ matrix.target == 'editor' }}
+        shell: sh
+        env:
+          BIN: ./bin/godot.linuxbsd.editor.x86_64
+        run: |
+          ${{ env.BIN }} --version
+          ${{ env.BIN }} --help
+          ${{ env.BIN }} --headless --test --test-case="[jsb]*" --force-colors
+
+      # 上面那份 editor 里有测试代码，不能发出去。发版时测试跑完再按不带测试的
+      # 参数重编一次，上传的是这一份。两次编译共用同一个 .scons_cache，
+      # 命令行相同的文件不会重编。
+      - name: Compilation (release, no tests)
+        if: ${{ inputs.release && matrix.target == 'editor' }}
+        uses: ./.github/actions/godot-build
+        with:
+          scons-flags: >-
+            ${{ env.SCONS_FLAGS }}
+          platform: linuxbsd
 
       - name: Save Godot build cache
         uses: ./.github/actions/godot-cache-save
@@ -175,16 +198,6 @@ jobs:
         uses: ./.github/actions/upload-artifact
         with:
           name: linux-${{ matrix.target }}-${{inputs.version}}-${{ matrix.engine }}
-
-      - name: Unit tests
-        if: ${{ !inputs.release && matrix.target == 'editor' }}
-        shell: sh
-        env:
-          BIN: ./bin/godot.linuxbsd.editor.x86_64
-        run: |
-          ${{ env.BIN }} --version
-          ${{ env.BIN }} --help
-          ${{ env.BIN }} --headless --test --test-case="[jsb]*" --force-colors
 
   # Editor built with AddressSanitizer. It uploads no artifact, it only runs the
   # JS tests with the sanitizer on. The flags below were measured on a local
