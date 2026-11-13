@@ -2,10 +2,10 @@
 #define GODOTJS_TESTS_JSB_ANY_RUNTIME_H
 
 #include "jsb_test_helpers.h"
-#include "../bridge/jsb_essentials.h"
-#include "../bridge/jsb_object_db.h"
-#include "../bridge/jsb_type_convert.h"
-#include "../compat/jsb_engine_compat.h"
+#include "../../bridge/jsb_essentials.h"
+#include "../../bridge/jsb_object_db.h"
+#include "../../bridge/jsb_type_convert.h"
+#include "../../compat/jsb_engine_compat.h"
 #include "scene/resources/atlas_texture.h"
 
 #define JSB_TESTS_OPTION_ENABLED(OptionName) kOption_##OptionName

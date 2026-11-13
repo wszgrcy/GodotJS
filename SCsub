@@ -511,40 +511,17 @@ if v8_support is not None:
     if jsb_platform in ["linux", "android"] and not env.msvc:
         env.Append(LIBS=["atomic"])
 
-    # Godot generates modules_tests.gen.h from every modules/*/tests/*.h and includes
-    # it from tests/test_main.cpp, so our test headers land in a translation unit that
-    # is built with the engine's own flags and sees the V8 headers too. tests/SCsub
-    # runs after the modules and shares this construction environment, so widening it
-    # here is the only way a module can reach that file. Builds without tests= are
-    # untouched.
-    if env["tests"]:
-        if env.msvc:
-            if "/std:c++17" in env["CXXFLAGS"]:
-                env["CXXFLAGS"].remove("/std:c++17")
-            env.Append(CXXFLAGS=["/std:c++20"])
-        else:
-            env.Append(CXXFLAGS=["-std=gnu++20"])
-
     # platform-specific defines
     if jsb_platform == "windows":
         env.Append(LINKFLAGS=["winmm.lib", "Dbghelp.lib"])
     if jsb_platform not in ["ios", "android"]:
         env_jsb.AppendUnique(CPPDEFINES=["V8_COMPRESS_POINTERS"])
-        env.AppendUnique(CPPDEFINES=["V8_COMPRESS_POINTERS"])
-        env_modules.AppendUnique(CPPDEFINES=["V8_COMPRESS_POINTERS"])
 
     # env_jsb.AppendUnique(CPPDEFINES=["V8_ENABLE_TURBOFAN"])
     env_jsb.AppendUnique(CPPDEFINES=["_ITERATOR_DEBUG_LEVEL=0"])
-    env.AppendUnique(CPPDEFINES=["_ITERATOR_DEBUG_LEVEL=0"])
-    env_modules.AppendUnique(CPPDEFINES=["_ITERATOR_DEBUG_LEVEL=0"])
 
     # headers
     env_jsb.Append(CPPPATH=[f"#modules/{module_name}/v8/include"])
-
-    # they're required by godot tests (otherwise, it can't find v8 headers)
-    env.Append(CPPPATH=[f"#modules/{module_name}/v8/include"])
-    env_modules.Append(CPPPATH=[f"#modules/{module_name}/v8/include"])
-
     env_jsb.Append(CPPPATH=["v8/include"])
     env_jsb.add_source_files(module_obj, "impl/v8/*.cpp")
 
@@ -607,6 +584,12 @@ env_jsb.add_source_files(module_obj, ["register_types.cpp", "jsb_project_preset.
 env_jsb.add_source_files(module_obj, "internal/*.cpp")
 env_jsb.add_source_files(module_obj, "weaver/*.cpp")
 env_jsb.add_source_files(module_obj, "bridge/*.cpp")
+
+# C++ 单测。TESTS_ENABLED 只加在本模块的编译环境上，引擎其它文件不受影响。
+# 为什么单独编一个编译单元，见 tests/jsb_tests.cpp 顶部说明。
+if env["tests"]:
+    env_jsb.Append(CPPDEFINES=["TESTS_ENABLED"])
+    env_jsb.add_source_files(module_obj, "tests/jsb_tests.cpp")
 
 # editor functionalities
 if env.editor_build:

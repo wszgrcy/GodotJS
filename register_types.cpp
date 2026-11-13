@@ -6,11 +6,23 @@
 #include "weaver-editor/jsb_weaver_editor.h"
 #endif
 
+#ifdef TESTS_ENABLED
+namespace jsb::tests { void force_link(); }
+#endif
+
 static Ref<ResourceFormatLoaderGodotJSScript> resource_loader_js;
 static Ref<ResourceFormatSaverGodotJSScript> resource_saver_js;
 
 void jsb_initialize_module(ModuleInitializationLevel p_level)
 {
+#ifdef TESTS_ENABLED
+    // 本模块的 C++ 单测在 tests/jsb_tests.cpp 里，只靠静态对象自注册，没有别处引用它，
+    // 链接器不会把这个目标文件从静态库里取出来。这里引用一下，把它拽进来。
+    if (p_level == MODULE_INITIALIZATION_LEVEL_CORE)
+    {
+        jsb::tests::force_link();
+    }
+#endif
     if (p_level == MODULE_INITIALIZATION_LEVEL_SERVERS)
     {
         GDREGISTER_CLASS(GodotJSScript);

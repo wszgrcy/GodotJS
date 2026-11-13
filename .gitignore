@@ -47,3 +47,5 @@ node_modules/
 
 
 *.log
+# 跑 godot --test 时进程会切到 tests/project，崩溃时 core 落在这里
+/tests/project/core.*

@@ -1,7 +1,7 @@
 #ifndef GODOTJS_TESTS_TEST_HELPERS_H
 #define GODOTJS_TESTS_TEST_HELPERS_H
 
-#include "../weaver/jsb_script_language.h"
+#include "../../weaver/jsb_script_language.h"
 #include "tests/test_macros.h"
 
 #include <chrono>
