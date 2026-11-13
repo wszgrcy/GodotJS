@@ -10,11 +10,12 @@
 namespace jsb
 {
     /**
-     * 用 V8 自带的模块机制加载 `.mjs`：`import` / `export` 直接交给 V8，
+     * 用 V8 自带的模块机制加载 ES 模块：`import` / `export` 直接交给 V8，
      * 不再像 CommonJS 那样把源码包进一个函数里执行。
      *
-     * 只有 `.mjs` 走这里，`.js` / `.cjs` / `.json` 仍然由 `DefaultModuleResolver` 按 CommonJS 加载。
-     * `.mjs` 里 import 一个非 ESM 文件时，会临时生成一个转发模块，见 `create_bridge_module`。
+     * 走这里的文件：`.mjs`，以及那些被自己那份 package.json 声明为 `"type": "module"` 的 `.js`。
+     * 其余 `.js` / `.cjs` / `.json` 仍由 `DefaultModuleResolver` 按 CommonJS 加载。
+     * ES 模块里 import 一个非 ESM 文件时，会临时生成一个转发模块，见 `create_bridge_module`。
      */
     class NativeESMModuleResolver : public DefaultModuleResolver
     {
@@ -52,6 +53,9 @@ namespace jsb
         /** 编译源码并记下 script_id。命名空间要等实例化之后才拿得到，这里先不碰 exports */
         static bool compile_module(Environment* p_env, const String& p_asset_path, const String& p_source, JavaScriptModule& p_module);
 
+        /** 从文件所在目录往上找最近的 package.json（工程根目录那份不算），判断它有没有把 `.js` 声明为 ES 模块 */
+        bool package_boundary_declares_esm(const String& p_source_path);
+
         /** 实例化并求值整个依赖图，再把图里每个模块的导出接到自己的命名空间上 */
         bool instantiate_and_evaluate(Environment* p_env, JavaScriptModule& p_root);
 
@@ -64,6 +68,9 @@ namespace jsb
 
         // 当前这次求值里编译出来的模块，求值结束后统一接导出、登记脚本类
         Vector<JavaScriptModule*> graph_modules_;
+
+        // 目录 -> 该目录下最近的 package.json 是否把 `.js` 声明为 ES 模块，一个目录只读一次
+        HashMap<String, bool> package_esm_cache_;
     };
 }
 

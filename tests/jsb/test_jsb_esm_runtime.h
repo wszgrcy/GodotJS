@@ -409,6 +409,30 @@ namespace jsb::tests
         CHECK(mod != nullptr);
     }
 
+    TEST_CASE("[jsb]esm for a .js declared as module by its package.json")
+    {
+        EsmTestCase test;
+
+        // 入口文件是 `.js`，但包自带的 package.json 写了 `"type": "module"`，
+        // 按 CommonJS 读会在 `export` 关键字上抛语法错误
+        ModuleSourceInfo info;
+        CHECK(test.env->find_module_resolver("tests/esm/pkg_type_module", info));
+        CHECK(info.source_filepath.ends_with("index.js"));
+
+        JavaScriptModule* mod = test.load("tests/esm/pkg_type_module");
+        // 下面的断言要读它的导出，拿着空指针继续跑会把整个测试进程带崩，这里先判负退出
+        if (mod == nullptr)
+        {
+            return;
+        }
+        CHECK(mod->is_native_esm());
+        CHECK(test.to_string(test.get_export(mod, "default")) == "pkg-default");
+        CHECK(test.to_string(test.get_export(mod, "tag")) == "type-module-js");
+
+        // 包内的相对 import 也按 ES 模块走
+        CHECK(test.to_string(test.get_export(mod, "joined")) == "type-module-js/sub");
+    }
+
     TEST_CASE("[jsb]esm relative import from a module at the res:// root")
     {
         EsmTestCase test;

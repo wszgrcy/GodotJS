@@ -163,18 +163,81 @@ namespace jsb
 
     bool NativeESMModuleResolver::get_source_info(const String& p_module_id, ModuleSourceInfo& r_source_info)
     {
-        // 搜索路径沿用 DefaultModuleResolver 的，只是把结果限制在 `.mjs`
+        // 搜索路径沿用 DefaultModuleResolver 的，只是把结果限制在 ES 模块文件
         if (!DefaultModuleResolver::get_source_info(p_module_id, r_source_info))
         {
             return false;
         }
 
-        if (!r_source_info.source_filepath.ends_with("." JSB_MODULE_EXT))
+        if (r_source_info.source_filepath.ends_with("." JSB_MODULE_EXT)
+            || package_boundary_declares_esm(r_source_info.source_filepath))
         {
-            r_source_info = {};
+            return true;
+        }
+
+        r_source_info = {};
+        return false;
+    }
+
+    bool NativeESMModuleResolver::package_boundary_declares_esm(const String& p_source_path)
+    {
+        // 只判 `.js`：`.mjs` 已经是 ES 模块，`.cjs` 按定义就是 CommonJS
+        if (!p_source_path.ends_with(".js"))
+        {
             return false;
         }
-        return true;
+
+        // 从文件所在目录往上找最近的 package.json，它的 `type` 字段说了算。工程根目录那份除外：
+        // 它描述的是构建工具的模块格式（很多工程因为它写了 `"type": "module"`），不代表引擎里
+        // `.js` 的加载格式。只认“包边界”上的声明，也就是第三方包自己带的那份 package.json
+
+        Vector<String> visited;
+        bool result = false;
+
+        for (String dir = internal::PathUtil::dirname(p_source_path); !dir.is_empty(); )
+        {
+            if (const bool* cached = package_esm_cache_.getptr(dir))
+            {
+                result = *cached;
+                break;
+            }
+            visited.push_back(dir);
+
+            const String package_json_path = internal::PathUtil::combine(dir, "package.json");
+            if (FileAccess::exists(package_json_path))
+            {
+                const bool is_project_root_manifest = package_json_path == "res://package.json"
+                    || package_json_path == "user://package.json";
+                if (!is_project_root_manifest)
+                {
+                    const Ref<FileAccess> file = FileAccess::open(package_json_path, FileAccess::READ);
+                    if (file.is_valid())
+                    {
+                        const Ref json = memnew(JSON);
+                        if (json->parse(file->get_as_utf8_string()) == OK)
+                        {
+                            const Dictionary& package_json = json->get_data();
+                            result = package_json.has("type") && String(package_json["type"]) == "module";
+                        }
+                    }
+                }
+                break;
+            }
+
+            const String parent = internal::PathUtil::dirname(dir);
+            if (parent == dir)
+            {
+                break;
+            }
+            dir = parent;
+        }
+
+        // 一路向上的目录共享同一个答案（它们都先碰到同一个 package.json）
+        for (const String& dir : visited)
+        {
+            package_esm_cache_[dir] = result;
+        }
+        return result;
     }
 
     bool NativeESMModuleResolver::load(Environment* p_env, const String& p_asset_path, JavaScriptModule& p_module, bool p_defer_esm_evaluation)
