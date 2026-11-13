@@ -81,7 +81,7 @@ namespace jsb::tests
         }
     };
 
-    TEST_CASE("[jsb]esm resolver only claims .mjs")
+    TEST_CASE("[jsb]esm resolver only claims es modules")
     {
         EsmTestCase test;
 
@@ -94,6 +94,11 @@ namespace jsb::tests
 
         CHECK(test.env->find_module_resolver("tests/esm/data", info));
         CHECK(info.source_filepath.ends_with(".json"));
+
+        // 没有 package.json 声明的 `.js` 仍按 CommonJS 加载
+        JavaScriptModule* cjs = test.load("tests/esm/cjs_target");
+        REQUIRE(cjs != nullptr);
+        CHECK(!cjs->is_native_esm());
     }
 
     TEST_CASE("[jsb]esm named, default and namespace imports")
@@ -402,6 +407,20 @@ namespace jsb::tests
         JavaScriptModule* mod = nullptr;
         CHECK(test.env->load("tests/esm/entry", &mod) == OK);
         CHECK(mod != nullptr);
+    }
+
+    TEST_CASE("[jsb]esm relative import from a module at the res:// root")
+    {
+        EsmTestCase test;
+
+        // 工程根目录下的模块，上一级目录是 `res://`。算成 `res:/` 时拼出来的路径找不到文件
+        JavaScriptModule* mod = test.load("esm_root_a");
+        // 同上：加载失败时不要拿着空指针继续读导出
+        if (mod == nullptr)
+        {
+            return;
+        }
+        CHECK(test.to_string(test.get_export(mod, "value")) == "root-sibling");
     }
 }
 

@@ -43,7 +43,15 @@ namespace jsb::internal
                 return String();
             }
         }
-        return p_name.substr(0, index);
+
+        String dir = p_name.substr(0, index);
+        // `res://a.js` 的上级是 `res://`，不是 `res:/`：只剔掉最后一个斜杠会把协议后面的
+        // 双斜杠削掉一个，拼出来的路径过不了 simplify_path
+        if (dir.ends_with(":/"))
+        {
+            dir += "/";
+        }
+        return dir;
     }
 
     String PathUtil::get_last_component(const String& p_name)
