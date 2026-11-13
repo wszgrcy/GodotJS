@@ -45,3 +45,5 @@ node_modules/
 /tests/project/gen/
 /tests/project/typings/
 
+
+*.log
