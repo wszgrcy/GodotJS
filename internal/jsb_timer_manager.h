@@ -39,8 +39,13 @@ namespace jsb::internal
      * @tparam kWheelNum number of wheels
      * @tparam kWheelSlotNum number of slots in each wheel
      * @tparam kJiffies the minimum time resolution (in milliseconds)
+     *
+     * kJiffies 取 1ms：`setTimeout` / `setInterval` 的延时是毫秒语义，轮子粒度粗于 1ms 时
+     * `WheelState::add` 的向下取整会把延时改小，定时器会提前触发（例如 16ms 的重复定时器
+     * 在 10ms 粒度下变成每 10ms 响一次）。粒度为 1ms 时取整不改变延时，到期时间就是请求的毫秒数。
+     * 覆盖范围 kJiffies * kWheelSlotNum ^ kWheelNum = 6^12 ms 约 25 天，够放得下 int32 上限的延时。
      */
-    template<typename TFunction, uint8_t kWheelNum = 12, uint8_t kWheelSlotNum = 6, uint64_t kJiffies = 10>
+    template<typename TFunction, uint8_t kWheelNum = 12, uint8_t kWheelSlotNum = 6, uint64_t kJiffies = 1>
     class TTimerManager
     {
     public:

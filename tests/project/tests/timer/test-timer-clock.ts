@@ -13,6 +13,8 @@ import { reportTestCompleted, reportTestFailure } from "../test-status";
  *    会在下一次推进时补上；如果武装定时器时不把它补进首次延时，到期时间就是拿一个落后的
  *    钟算出来的，欠的那段会被算成「已经等过了」，定时器当场就响。典型后果：测试看门狗
  *    明明只过了 2 秒就报「超时 5 秒」。
+ * 3. 延时的毫秒数不能被定时器轮的粒度改小。轮子按格子取整，取整方向朝下时，请求 16ms 的
+ *    重复定时器会按更短的间隔反复触发（实测每 10ms 一次）。`checkNeverEarly` 专门量这件事。
  *
  * 为什么单独起进程、把本场景当主场景跑，而不是挂进 `start.ts` 的场景清单：首帧猛推只在
  * 进程的第一帧看得见，等 `start.ts` 把场景加载进来时早就过去了。跑法见
@@ -31,8 +33,8 @@ const BUDGET_MS = 20000;
 /** 模拟主线程被占住的时长。要明显大于被测定时器的延时，才能暴露「延时被欠账吃掉」。 */
 const STALL_MS = 1200;
 
-/** 定时器轮的最小粒度是 10ms（`kJiffies`），判定下界要留出这段量化误差。 */
-const JIFFIE_SLACK_MS = 10;
+/** 定时器轮的最小粒度是 1ms（`kJiffies`），判定下界要留出这段量化误差。 */
+const JIFFIE_SLACK_MS = 1;
 
 /** 判定上界留的余量：一帧的墙上时间加上轮子粒度，再放宽一点。 */
 const LATENESS_BUDGET_MS = 150;
@@ -81,6 +83,7 @@ export default class TimerClock extends Node {
 
 			await this.checkDelay(60);
 			await this.checkDelay(300);
+			await this.checkNeverEarly();
 			await this.checkInterval();
 			await this.checkSetImmediate();
 			await this.checkAfterStall();
@@ -107,6 +110,51 @@ export default class TimerClock extends Node {
 		check(`setTimeout(${String(ms)}ms)`, took >= minMs && took <= maxMs, `实际 ${String(took)}ms，期望 ${String(minMs)}~${String(maxMs)}ms`);
 	}
 
+	/**
+	 * 延时要按请求的毫秒数兑现，不能被轮子粒度取整取小了。取 1、5、15、16、19、25、29 这些
+	 * 不是 10 的倍数的值：粒度 10ms 且向下取整时，16/19 会被压成 10ms，25/29 会被压成 20ms。
+	 */
+	private async checkNeverEarly(): Promise<void> {
+		for (const ms of [1, 5, 15, 16, 19, 25, 29]) {
+			const took = await this.timed(() => new Promise<void>((resolve) => setTimeout(resolve, ms)));
+			check(
+				`setTimeout(${String(ms)}ms) 不能提前触发`,
+				took >= ms - JIFFIE_SLACK_MS,
+				`只等了 ${String(took)}ms 就触发了`
+			);
+		}
+
+		// 重复定时器的平均间隔：间隔被取小会让次数明显超出窗口应有的次数
+		for (const rate of [16, 25]) {
+			const gaps = await this.measureIntervalGaps(rate, 6);
+			const average = gaps.reduce((sum, gap) => sum + gap, 0) / gaps.length;
+			check(
+				`setInterval(${String(rate)}ms) 平均间隔不短于设定值`,
+				average >= rate - JIFFIE_SLACK_MS,
+				`平均间隔 ${average.toFixed(1)}ms`
+			);
+		}
+	}
+
+	/** 量重复定时器相邻两次触发之间的间隔，返回两个相邻时间戳之差。 */
+	private async measureIntervalGaps(rate: number, samples: number): Promise<number[]> {
+		const stamps: number[] = [];
+		await new Promise<void>((resolve) => {
+			const interval = setInterval(() => {
+				stamps.push(Date.now());
+				if (stamps.length >= samples) {
+					clearInterval(interval);
+					resolve();
+				}
+			}, rate);
+		});
+		const gaps: number[] = [];
+		for (let index = 1; index < stamps.length; ++index) {
+			gaps.push(stamps[index] - stamps[index - 1]);
+		}
+		return gaps;
+	}
+
 	private async checkInterval(): Promise<void> {
 		let count = 0;
 		const interval = setInterval(() => {
@@ -115,7 +163,7 @@ export default class TimerClock extends Node {
 		await this.timed(() => new Promise<void>((resolve) => setTimeout(resolve, 200)));
 		clearInterval(interval);
 
-		// 40ms 的间隔实际落在 40~50ms（轮子粒度 10ms），200ms 至少该有 4 次
+		// 40ms 的间隔实际落在 40~50ms（一帧的墙上时间会推后重排时间），200ms 至少该有 4 次
 		const fired = count;
 		check("setInterval(40ms) 按次数推进", fired >= 4 && fired <= 12, `200ms 内只触发了 ${String(fired)} 次`);
 
