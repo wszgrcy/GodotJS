@@ -206,8 +206,8 @@ jsb_defines = [
         "and the connection will break immediately by `devtools` if `selected_protocol` is assigned manually in `WSLPeer`",
     ]),
     CompileDefines("JSB_NATIVE_ESM", 1 if env["jsb_native_esm"] else 0, [
-        "Enable the additive native ESM module resolver (.mjs only).",
-        "When enabled, `.mjs` modules are compiled via `v8::ScriptCompiler::CompileModule`, so `import`/`export`, `import.meta`, `import()`, cyclic imports and top-level await work the way V8 implements them. `.js`/`.cjs`/`.json` stay on the CommonJS path; importing one of those from a `.mjs` goes through a generated bridge module.",
+        "Enable the additive native ESM module resolver (`.mjs`, plus `.js` whose nearest package.json says `\"type\": \"module\"`).",
+        "When enabled, those modules are compiled via `v8::ScriptCompiler::CompileModule`, so `import`/`export`, `import.meta`, `import()`, cyclic imports and top-level await work the way V8 implements them. Other `.js`/`.cjs`/`.json` stay on the CommonJS path; importing one of those from an ES module goes through a generated bridge module.",
         "V8 only. Default off. See `bridge/jsb_native_esm_resolver.{h,cpp}`.",
     ]),
 ]

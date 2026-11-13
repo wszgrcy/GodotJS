@@ -15,7 +15,7 @@ def get_opts(platform):
     return [
         BoolVariable("skip_js_runtime", "Skip building GodotJS JavaScript runtime files", False),
         BoolVariable("use_typescript", "Build with typescript support (enabled by default)", True),
-        BoolVariable("jsb_native_esm", "Enable the native ESM module resolver (.mjs only, V8 only, additive)", False),
+        BoolVariable("jsb_native_esm", "Enable the native ESM module resolver (.mjs and .js declared as module by package.json; V8 only, additive)", False),
     ]
 
 def configure(env):
