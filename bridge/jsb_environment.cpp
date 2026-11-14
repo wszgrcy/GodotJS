@@ -710,8 +710,16 @@ namespace jsb
         // call 'ontransfer'
         {
             ObjectHandleConstPtr handle = object_db_.try_get_object(p_data->source_worker_id);
+            if (jsb_unlikely(!handle || handle->ref_.IsEmpty()))
+            {
+                // The JS object of this worker is already collected by v8 while its entry is
+                // still registered in the object db (removed on the later gc pass), so there
+                // is no receiver for `ontransfer`. Dropping it is the defined behavior.
+                handle = nullptr;
+                JSB_LOG(Debug, "the JS object of worker %d is already collected, the transfer is dropped", p_data->source_worker_id);
+                return;
+            }
             const v8::Local<v8::Object> worker = handle->ref_.Get(isolate_).As<v8::Object>();
-            jsb_check(!worker.IsEmpty());
             handle = nullptr;
 
             v8::Local<v8::Value> transferred_obj;
@@ -800,8 +808,15 @@ namespace jsb
             JSB_LOG(Error, "invalid worker");
             return;
         }
+        if (jsb_unlikely(handle->ref_.IsEmpty()))
+        {
+            // Same as above: the entry is still registered but v8 already collected the JS
+            // object, so this message has no receiver and is dropped instead of being fatal.
+            handle = nullptr;
+            JSB_LOG(Debug, "the JS object of worker %d is already collected, the message is dropped", p_message.get_id());
+            return;
+        }
         const v8::Local<v8::Object> obj = handle->ref_.Get(isolate_).As<v8::Object>();
-        jsb_check(!obj.IsEmpty());
         handle = nullptr;
 
         v8::Local<v8::Value> callback;
